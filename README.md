@@ -6,7 +6,9 @@
 
 **Inmis** is a feature-rich Backpack mod for Minecraft, available across multiple Minecraft versions and modding platforms. This repository contains optimized implementations for **Forge** (1.18.2, 1.19.2, 1.20.1) and **NeoForge** (1.21.1).
 
-## 📦 Overview
+This is a port of the original [Fabric version](https://github.com/Draylar/inmis) to Forge and NeoForge modloaders.
+
+## Overview
 
 Inmis provides players with customizable backpacks that can be:
 - Opened via right-click or keybind (default: **B**)
@@ -14,7 +16,7 @@ Inmis provides players with customizable backpacks that can be:
 - Enhanced with Trinket compatibility for additional equip slots
 - Configured through `config/inmis.json` for custom gameplay
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```
 inmis-forge-neoforge/
@@ -37,7 +39,7 @@ inmis-forge-neoforge/
 └── images/                # Documentation images
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Java Development Kit (JDK) 8+ for older versions, JDK 17+ for 1.21.1
@@ -54,7 +56,7 @@ cd forge-1.20.1/inmis
 
 The compiled mod will be available in `build/libs/`.
 
-## 📋 Features
+## Features
 
 ### Core Functionality
 - **Multiple Backpack Types**: Frayed, Baby, Plated, Gilded, Bejeweled, Withered, and Endless Backpacks
@@ -73,7 +75,7 @@ Customize gameplay through `config/inmis.json`:
 - Add custom backpacks with custom properties
 - Adjust inventory sizes and features
 
-## 📁 Version-Specific Details
+## Version-Specific Details
 
 ### Forge Versions (1.18.2, 1.19.2, 1.20.1)
 Each Forge version includes:
@@ -87,7 +89,7 @@ Latest version with:
 - Updated to Minecraft 1.21.1 features
 - Enhanced performance optimizations
 
-## 🔧 Development
+## Development
 
 ### Project Structure
 Each version follows the standard Minecraft mod development structure:
@@ -115,11 +117,11 @@ inmis/
 - **Curios**: Trinket/accessory system
 - **Fabric API** (if using compatibility layer): Utility functions
 
-## 📝 License
+## License
 
 Inmis is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please consider:
 1. Opening an issue to discuss major changes
@@ -127,13 +129,13 @@ Contributions are welcome! Please consider:
 3. Following the existing code style
 4. Documenting new features in config examples
 
-## 📞 Support & Contact
+## Support & Contact
 
 For issues, questions, or suggestions:
 - Check the [GitHub Issues](https://github.com/Draylar/inmis/issues)
 - Review configuration examples in each version's `config/inmis.json`
 
-## 🎮 Installation
+## Installation
 
 ### For Players
 1. Download the appropriate JAR for your Minecraft version from releases
@@ -144,7 +146,7 @@ For issues, questions, or suggestions:
 ### For Developers
 See the Development section above for building from source.
 
-## 🔄 Version Support Timeline
+## Version Support Timeline
 
 | Version | Modloader | Status | Java |
 |---------|-----------|--------|------|
@@ -152,13 +154,6 @@ See the Development section above for building from source.
 | 1.19.2  | Forge     | Active | 17+  |
 | 1.20.1  | Forge     | Active | 17+  |
 | 1.21.1  | NeoForge  | Active | 21+  |
-
-## 📊 Project Statistics
-
-- **Multiple Version Support**: 4 major Minecraft versions
-- **Active Development**: Continuously updated
-- **Community-Focused**: Feedback-driven improvements
-- **Stable & Tested**: Thoroughly tested across platforms
 
 ---
 
