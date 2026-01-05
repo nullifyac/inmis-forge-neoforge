@@ -1,0 +1,40 @@
+{
+  "itemGroup.inmis.backpack": "Inmis",
+
+  "ui.inmis.backpack": "Mochila",
+
+  "item.inmis.baby_backpack": "Mochila de bebé",
+  "item.inmis.ender_pouch": "Mochila de ender",
+
+  "item.inmis.frayed_backpack": "Mochila gastada",
+  "item.inmis.plated_backpack": "Mochila blindada",
+  "item.inmis.gilded_backpack": "Mochila dorada",
+  "item.inmis.bejeweled_backpack": "Mochila enjoyada",
+  "item.inmis.blazing_backpack": "Mochila flameante",
+  "item.inmis.withered_backpack": "Mochila marchita",
+  "item.inmis.endless_backpack": "Mochila sin fin",
+
+  "inmis.advancement.baby_backpack.title": "Bolsa de obsequios",
+  "inmis.advancement.baby_backpack.description": "¡Perfecta para regalos festivos!",
+
+  "inmis.advancement.ender_pouch.title": "Acceso al Ender",
+  "inmis.advancement.ender_pouch.description": "Meter la mano dentro de esta bolsa te da acceso a tu Cofre de Ender...",
+
+  "inmis.advancement.frayed_backpack.title": "Comienzos de la mochila",
+  "inmis.advancement.frayed_backpack.description": "¡No es mucho, pero es mía! Crea una Mochila gastada para expandir tu espacio de inventario.",
+  "inmis.advancement.plated_backpack.title": "Subiendo de nivel",
+  "inmis.advancement.plated_backpack.description": "Rodea tu Mochila gastada con lingotes de hierro para expandir sus capacidades de almacenamiento.",
+  "inmis.advancement.gilded_backpack.title": "Toque de Midas",
+  "inmis.advancement.gilded_backpack.description": "Mejora tu Mochila blindada revistiéndola de oro. ¡Brillante!",
+  "inmis.advancement.bejeweled_backpack.title": "Cúbrelo con varias gemas",
+  "inmis.advancement.bejeweled_backpack.description": "Pega algunas gemas raras en tu Mochila dorada para hacerla aún más brillante.",
+  "inmis.advancement.blazing_backpack.title": "Alternativas ardientes",
+  "inmis.advancement.blazing_backpack.description": "Reviste tu mochila con Netherita para hacerla inmune al fuego y la lava.",
+  "inmis.advancement.withered_backpack.title": "Extensión de dominio",
+  "inmis.advancement.withered_backpack.description": "Mejora tu mochila brillante con un trofeo obtenido del rey desolado.",
+  "inmis.advancement.endless_backpack.title": "El Fin",
+  "inmis.advancement.endless_backpack.description": "Obtén la mochila definitiva, alimentada por el poder del End.",
+
+  "category.inmis.keybindings": "Inmis",
+  "key.inmis.open_backpack": "Abrir la mochila"
+}

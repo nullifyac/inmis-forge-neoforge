@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "draylar.inmis.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "inmis.refmap.json",
+  "mixins": [
+    "InventoryMenuMixin",
+    "PlayerInventoryScreenMixin",
+    "ShapedRecipeMixin"
+  ],
+  "client": [
+    "ItemStackMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,36 @@
+modLoader="javafml"
+loaderVersion="[40,)"
+license="MIT"
+
+[[mods]]
+modId="inmis"
+version="${version}"
+displayName="Inmis"
+description="I need more inventory space!"
+authors="Draylar"
+credits="shedaniel, OmegaJak"
+logoFile="assets/inmis/icon.png"
+
+[[dependencies.inmis]]
+modId="forge"
+mandatory=true
+versionRange="[40,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.inmis]]
+modId="minecraft"
+mandatory=true
+versionRange="[${minecraft_version},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.inmis]]
+modId="curios"
+mandatory=false
+versionRange="[1.18.2-5.0.9.1,)"
+ordering="NONE"
+side="BOTH"
+
+[[mixins]]
+config="inmis.mixins.json"

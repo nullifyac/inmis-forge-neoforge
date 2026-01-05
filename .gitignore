@@ -1,0 +1,46 @@
+# Build artifacts
+build/
+out/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+*.launch
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Runtime
+run/
+/logs/
+/minecraft/
+/minecraft/*
+/minepkg-lock.toml
+
+# IDE
+bin/
+
+# Project-specific
+/images/
+
+# Ignore generated debug folders
+**/debug/

@@ -1,0 +1,19 @@
+manifestVersion = 0
+
+[package]
+  type = "mod"
+  name = "inmis"
+  description = "I need more inventory space!"
+  version = "2.3.1"
+  platform = "forge"
+  license = "MIT"
+
+[requirements]
+  minecraft = "*"
+  forge = "*"
+
+[dependencies]
+  forge = "*"
+
+[dev]
+  buildCommand = "./gradlew build"
