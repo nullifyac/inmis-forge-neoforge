@@ -63,7 +63,7 @@ The compiled mod will be available in `build/libs/`.
 - **Armor Integration**: Equip backpacks in the chestplate slot
 
 ### Compatibility
-- **Trinkets Mod**: Equip backpacks in dedicated Trinket slots for enhanced gameplay
+- **Curios Mod**: Equip backpacks in dedicated Curio slots for enhanced gameplay
 - **ShulkerBoxTooltip**: Preview backpack contents via tooltip
 
 ### Configuration
@@ -138,8 +138,8 @@ For issues, questions, or suggestions:
 ### For Players
 1. Download the appropriate JAR for your Minecraft version from releases
 2. Place it in your mods folder
-3. Install [Curios](https://www.curseforge.com/minecraft/mc-mods/curios) (required for armor equipping)
-4. Optionally install [Trinkets](https://www.curseforge.com/minecraft/mc-mods/trinkets-fabric) for Trinket compatibility
+3. Install [Curios](https://www.curseforge.com/minecraft/mc-mods/curios) (required for trinket slot support)
+4. Optionally install other mods that integrate with Curios for additional customization
 
 ### For Developers
 See the Development section above for building from source.
