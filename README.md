@@ -36,7 +36,6 @@ inmis-forge-neoforge/
 │   ├── inmis/             # Main mod source
 │   ├── Curios-1.21.x/     # Curios mod (dependency)
 │   └── release/           # Built artifacts
-└── images/                # Documentation images
 ```
 
 ## Quick Start
