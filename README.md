@@ -2,7 +2,6 @@
 
 ![Minecraft](https://img.shields.io/badge/Minecraft-Java%20Edition-brightgreen)
 ![License](https://img.shields.io/github/license/Draylar/inmis)
-![Stars](https://img.shields.io/github/nullifyac/inmis-forge-neoforge)
 
 **Inmis** is a feature-rich Backpack mod for Minecraft, available across multiple Minecraft versions and modding platforms. This repository contains optimized implementations for **Forge** (1.18.2, 1.19.2, 1.20.1) and **NeoForge** (1.21.1).
 
