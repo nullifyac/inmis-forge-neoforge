@@ -3,7 +3,7 @@
 ![Minecraft](https://img.shields.io/badge/Minecraft-Java%20Edition-brightgreen)
 ![License](https://img.shields.io/github/license/Draylar/inmis)
 
-**Inmis** is a feature-rich Backpack mod for Minecraft, available across multiple Minecraft versions and modding platforms. This repository contains optimized implementations for **Forge** (1.18.2, 1.19.2, 1.20.1) and **NeoForge** (1.21.1).
+**Inmis** is a Backpack mod for Minecraft, available only on Fabric until now. This repository contains implementations for **Forge** (1.18.2, 1.19.2, 1.20.1) and **NeoForge** (1.21.1).
 
 This is a port of the original [Fabric version](https://github.com/Draylar/inmis) to Forge and NeoForge modloaders.
 
@@ -127,22 +127,8 @@ Contributions are welcome! Please consider:
 3. Following the existing code style
 4. Documenting new features in config examples
 
-## Support & Contact
-
-For issues, questions, or suggestions:
-- Check the [GitHub Issues](https://github.com/Draylar/inmis/issues)
-- Review configuration examples in each version's `config/inmis.json`
-
-## Installation
-
 ### For Players
-1. Download the appropriate JAR for your Minecraft version from releases
-2. Place it in your mods folder
-3. Install [Curios](https://www.curseforge.com/minecraft/mc-mods/curios) (required for trinket slot support)
-4. Optionally install other mods that integrate with Curios for additional customization
-
-### For Developers
-See the Development section above for building from source.
+- Download [Inmis (Forge/NeoForge)](https://www.curseforge.com/minecraft/mc-mods/inmis-forge-port)
 
 ## Version Support Timeline
 
