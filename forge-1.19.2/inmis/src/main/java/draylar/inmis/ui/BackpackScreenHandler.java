@@ -7,7 +7,6 @@ import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.util.InventoryUtils;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
@@ -48,7 +47,7 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
         int rowWidth = tier.getRowWidth();
         int numberOfRows = tier.getNumberOfRows();
 
-        ListTag tag = backpackStack.getOrCreateTag().getList("Inventory", Tag.TAG_COMPOUND);
+        ListTag tag = Inmis.getOrCreateInventory(backpackStack, tier);
         BackpackInventory inventory = new BackpackInventory(rowWidth * numberOfRows) {
             @Override
             public void setChanged() {

@@ -35,6 +35,16 @@ public class InmisConfig {
 
     public boolean spillMainBackpacksOnDeath = false;
 
+    public boolean importBackpackedItems = false;
+
+    public String autoBackpackedTier = "blazing";
+
+    public int autoBackpackedColumns = 9;
+
+    public int autoBackpackedRows = 6;
+
+    public boolean autoBackpackedAllowSmaller = true;
+
     public boolean trinketRendering = true;
 
     public String guiTitleColor = "0x404040";

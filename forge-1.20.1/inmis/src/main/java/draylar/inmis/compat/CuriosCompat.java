@@ -18,6 +18,8 @@ import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 public final class CuriosCompat {
 
@@ -118,5 +120,22 @@ public final class CuriosCompat {
                 handler.setEquippedCurio(result.slotContext().identifier(), result.slotContext().index(), ItemStack.EMPTY);
             }
         });
+    }
+
+    public static int replaceMatchingStacks(Player player, Predicate<ItemStack> matcher, UnaryOperator<ItemStack> converter) {
+        return CuriosApi.getCuriosInventory(player).resolve()
+                .map(handler -> {
+                    List<SlotResult> curios = handler.findCurios(matcher::test);
+                    int converted = 0;
+                    for (SlotResult result : curios) {
+                        ItemStack replacement = converter.apply(result.stack());
+                        if (replacement != null && !replacement.isEmpty()) {
+                            handler.setEquippedCurio(result.slotContext().identifier(), result.slotContext().index(), replacement);
+                            converted++;
+                        }
+                    }
+                    return converted;
+                })
+                .orElse(0);
     }
 }

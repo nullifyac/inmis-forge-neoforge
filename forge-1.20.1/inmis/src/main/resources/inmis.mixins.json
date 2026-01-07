@@ -7,6 +7,7 @@
     "AbstractContainerMenuAccessor",
     "InventoryMenuMixin",
     "PlayerInventoryScreenMixin",
+    "RecipeManagerMixin",
     "ShapedRecipeMixin"
   ],
   "client": [

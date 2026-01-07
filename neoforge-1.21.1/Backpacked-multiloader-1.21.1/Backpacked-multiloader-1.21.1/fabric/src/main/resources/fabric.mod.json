@@ -1,0 +1,60 @@
+{
+    "schemaVersion": 1,
+    "id": "${mod_id}",
+    "version": "${mod_version}",
+    "name": "${mod_name}",
+    "description": "${mod_desc}",
+    "authors": [ "${mod_author}" ],
+    "contact": {
+        "homepage": "${mod_homepage}",
+        "sources": "${mod_source}",
+        "issues": "${mod_issues}"
+    },
+    "license": "${mod_license}",
+    "icon": "assets/${mod_id}/icon.png",
+    "environment": "*",
+    "entrypoints": {
+        "main": [
+            "com.mrcrayfish.backpacked.Backpacked"
+        ],
+        "client": [
+            "com.mrcrayfish.backpacked.client.ClientHandler"
+        ],
+        "fabric-datagen": [
+            "com.mrcrayfish.backpacked.datagen.DataGeneration"
+        ]
+    },
+    "mixins": [
+        "backpacked.fabric.mixins.json",
+        "backpacked.common.mixins.json"
+    ],
+    "depends": {
+        "fabricloader": ">=${fabric_loader_version}",
+        "fabric": "*",
+        "minecraft": "${minecraft_version}",
+        "java": ">=21",
+        "framework": ">=${framework_version}"
+    },
+    "recommends": {
+        "yigd": ">=${yigd_fabric_version}"
+    },
+    "accessWidener": "backpacked.accesswidener",
+    "custom": {
+        "framework": {
+            "containers": [
+                "com.mrcrayfish.backpacked.core"
+            ],
+            "configs": [
+                "com.mrcrayfish.backpacked.Config"
+            ]
+        },
+        "configured": {
+            "background": "minecraft:textures/block/dirt.png"
+        },
+        "catalogue": {
+            "banner": "assets/${mod_id}/banner.png",
+            "background": "assets/${mod_id}/background.png"
+        }
+    }
+}
+  

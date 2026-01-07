@@ -1,9 +1,9 @@
 package draylar.inmis.mixin;
 
+import draylar.inmis.Inmis;
 import draylar.inmis.item.BackpackItem;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.ShapedRecipe;
@@ -27,7 +27,7 @@ public abstract class ShapedRecipeMixin {
             ItemStack newBackpack = this.getResultItem(registryAccess).copy();
 
             if (newBackpack.getItem() instanceof BackpackItem) {
-                ListTag oldTag = centerSlot.getOrCreateTag().getList("Inventory", Tag.TAG_COMPOUND);
+                ListTag oldTag = Inmis.getOrCreateInventory(centerSlot);
                 newBackpack.getOrCreateTag().put("Inventory", oldTag.copy());
                 cir.setReturnValue(newBackpack);
             }

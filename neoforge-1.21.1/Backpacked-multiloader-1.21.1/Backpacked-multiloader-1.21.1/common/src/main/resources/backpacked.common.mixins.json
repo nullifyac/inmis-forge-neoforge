@@ -1,0 +1,40 @@
+{
+    "required": true,
+    "minVersion": "0.8",
+    "package": "com.mrcrayfish.backpacked.mixin",
+    "compatibilityLevel": "JAVA_17",
+    "refmap": "backpacked.refmap.json",
+    "mixins": [
+        "common.AbstractArrowMixin",
+        "common.BlockItemInvoker",
+        "common.BlockItemMixin",
+        "common.BredAnimalsTriggerMixin",
+        "common.BushBlockMixin",
+        "common.CreativeModeTabMixin",
+        "common.CropBlockMixin",
+        "common.EntityMixin",
+        "common.HopperBlockEntityMixin",
+        "common.IntegerPropertyMixin",
+        "common.ItemEntityMixin",
+        "common.LevelMixin",
+        "common.LivingEntityMixin",
+        "common.MerchantResultSlotMixin",
+        "common.MobMixin",
+        "common.PackDetectorMixin",
+        "common.PackMixin",
+        "common.PlayerInteractTriggerMixin",
+        "common.PlayerInventoryMixin",
+        "common.PlayerMixin",
+        "common.ServerLevelMixin",
+        "common.ServerPlayerGameModeMixin",
+        "common.ServerPlayerMixin"
+    ],
+    "client": [
+        "client.BitmapProviderDefinitionMixin"
+    ],
+    "injectors": {
+        "defaultRequire": 1,
+        "maxShiftBy": 1
+  }
+}
+  

@@ -1,0 +1,12 @@
+{
+    "unlock_challenge": {
+        "formatter": "backpacked:incomplete_complete",
+        "challenge": {
+            "type": "backpacked:kill_mob",
+            "mob": {
+                "type": "minecraft:ender_dragon"
+            },
+            "count": 1
+        }
+    }
+}

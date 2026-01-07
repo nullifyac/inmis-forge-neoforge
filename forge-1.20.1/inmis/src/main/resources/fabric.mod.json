@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "inmis",
+  "version": "${version}+forge",
+  "name": "Inmis (Forge build)",
+  "description": "This Forge build ships a Fabric metadata stub so cross-loader utilities can identify it correctly.",
+  "license": "MIT",
+  "environment": "*",
+  "custom": {
+    "distribution": "forge"
+  },
+  "depends": {
+    "fabricloader": ">=999.0.0"
+  }
+}

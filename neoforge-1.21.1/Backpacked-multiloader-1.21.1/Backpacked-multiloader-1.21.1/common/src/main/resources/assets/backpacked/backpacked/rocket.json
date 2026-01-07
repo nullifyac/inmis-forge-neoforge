@@ -1,0 +1,58 @@
+{
+    "shelf_offset": [0, 0, 0],
+    "bobbing": false,
+    "gui_display": {
+        "rotation": [30, 30, 0],
+        "translation": [-1.25, 5.25, 0],
+        "scale": [1.4, 1.4, 1.4]
+    },
+    "renderer": {
+        "type": "backpacked:advanced",
+        "functions": [
+            {
+                "type": "backpacked:draw_model",
+                "model": "backpacked:backpacked/rocket"
+            },
+            {
+                "type": "backpacked:conditional",
+                "condition": {
+                    "type": "backpacked:test_value",
+                    "first": {
+                        "type": "backpacked:entity_data",
+                        "property": "fall_flying_counter"
+                    },
+                    "second": 0.1,
+                    "comparison": "greater_than"
+                },
+                "functions": [
+                    {
+                        "type": "backpacked:spawn_particle",
+                        "particle": {
+                            "type": "minecraft:smoke"
+                        },
+                        "position": {
+                            "y": -0.625,
+                            "z": 0.125
+                        },
+                        "motion": {
+                            "y": -0.25
+                        }
+                    },
+                    {
+                        "type": "backpacked:spawn_particle",
+                        "particle": {
+                            "type": "minecraft:poof"
+                        },
+                        "position": {
+                            "y": -0.625,
+                            "z": 0.125
+                        },
+                        "motion": {
+                            "y": -0.25
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

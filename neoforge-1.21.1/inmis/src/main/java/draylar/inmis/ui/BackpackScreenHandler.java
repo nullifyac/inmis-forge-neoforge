@@ -20,7 +20,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.ShulkerBoxBlock;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class BackpackScreenHandler extends AbstractContainerMenu {
@@ -52,9 +51,7 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
         int numberOfRows = tier.getNumberOfRows();
         int size = rowWidth * numberOfRows;
 
-        BackpackComponent component = backpackStack.getOrDefault(
-                Inmis.BACKPACK_COMPONENT.get(),
-                new BackpackComponent(createEmptyList(size)));
+        BackpackComponent component = Inmis.getOrCreateComponent(backpackStack, tier);
 
         BackpackInventory inventory = new BackpackInventory(size) {
             @Override
@@ -89,14 +86,6 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
         }
 
         backpackStack.set(Inmis.BACKPACK_COMPONENT.get(), BackpackComponent.fromContainer(inventory));
-    }
-
-    private static List<ItemStack> createEmptyList(int size) {
-        List<ItemStack> items = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            items.add(ItemStack.EMPTY);
-        }
-        return items;
     }
 
     public BackpackItem getItem() {

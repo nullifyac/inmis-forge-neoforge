@@ -1,5 +1,9 @@
 package draylar.inmis;
 
+import draylar.inmis.command.BackpackedConversionCommand;
+import draylar.inmis.compat.BackpackedDataImporter;
+import draylar.inmis.compat.BackpackedImportController;
+import draylar.inmis.compat.BackpackedMigrationManager;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.config.ConfigManager;
 import draylar.inmis.config.InmisConfig;
@@ -30,6 +34,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -80,6 +85,7 @@ public class Inmis {
 
     public Inmis(IEventBus eventBus, ModContainer modContainer) {
         CONFIG = ConfigManager.load();
+        BackpackedMigrationManager.bootstrapFromConfig();
 
         ITEMS.register(eventBus);
         MENUS.register(eventBus);
@@ -92,6 +98,8 @@ public class Inmis {
         eventBus.addListener(Inmis::buildCreativeTab);
         eventBus.addListener(ServerNetworking::registerPayloadHandlers);
         NeoForge.EVENT_BUS.addListener(Inmis::onLivingDrops);
+        NeoForge.EVENT_BUS.addListener(Inmis::registerCommands);
+        NeoForge.EVENT_BUS.addListener(BackpackedMigrationManager::onPlayerLogin);
     }
 
     private void registerBackpacks() {
@@ -124,6 +132,10 @@ public class Inmis {
                     ITEMS.register(backpack.getName().toLowerCase() + "_backpack", () -> item);
             BACKPACKS.add(registered);
         }
+    }
+
+    private static void registerCommands(RegisterCommandsEvent event) {
+        BackpackedConversionCommand.register(event.getDispatcher(), event.getBuildContext());
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
@@ -184,7 +196,7 @@ public class Inmis {
     }
 
     public static boolean isBackpackEmpty(ItemStack stack) {
-        BackpackComponent component = stack.get(BACKPACK_COMPONENT.get());
+        BackpackComponent component = getOrCreateComponent(stack);
         if (component == null) {
             return true;
         }
@@ -198,27 +210,77 @@ public class Inmis {
     }
 
     public static List<ItemStack> getBackpackContents(ItemStack stack) {
-        BackpackComponent component = stack.get(BACKPACK_COMPONENT.get());
+        BackpackComponent component = getOrCreateComponent(stack);
         return component != null ? component.stacks() : List.of();
     }
 
     public static void wipeBackpack(ItemStack stack) {
-        int size = 0;
-        BackpackComponent component = stack.get(BACKPACK_COMPONENT.get());
-        if (component != null) {
-            size = component.stacks().size();
-        } else if (stack.getItem() instanceof BackpackItem backpackItem) {
-            BackpackInfo info = backpackItem.getTier();
-            size = info.getRowWidth() * info.getNumberOfRows();
+        BackpackComponent component = getOrCreateComponent(stack);
+        if (component == null) {
+            return;
         }
 
-        if (size > 0) {
-            List<ItemStack> empty = new ArrayList<>(size);
-            for (int i = 0; i < size; i++) {
-                empty.add(ItemStack.EMPTY);
-            }
-            stack.set(BACKPACK_COMPONENT.get(), new BackpackComponent(empty));
+        int size = component.stacks().size();
+        if (size <= 0) {
+            return;
         }
+
+        stack.set(BACKPACK_COMPONENT.get(), new BackpackComponent(createEmptyContents(size)));
+    }
+
+    public static BackpackComponent getOrCreateComponent(ItemStack stack) {
+        if (stack.getItem() instanceof BackpackItem backpackItem) {
+            return getOrCreateComponent(stack, backpackItem.getTier());
+        }
+
+        return stack.get(BACKPACK_COMPONENT.get());
+    }
+
+    public static BackpackComponent getOrCreateComponent(ItemStack stack, BackpackInfo tier) {
+        int size = Math.max(0, tier.getRowWidth() * tier.getNumberOfRows());
+        if (size == 0) {
+            return stack.get(BACKPACK_COMPONENT.get());
+        }
+
+        BackpackComponent component = stack.get(BACKPACK_COMPONENT.get());
+        if (component == null && BackpackedImportController.isImportEnabled()) {
+            component = BackpackedDataImporter.tryImport(stack, tier);
+        }
+
+        BackpackComponent normalized = normalizeComponent(component, size);
+        if (normalized != null) {
+            stack.set(BACKPACK_COMPONENT.get(), normalized);
+        }
+        return normalized;
+    }
+
+    private static BackpackComponent normalizeComponent(BackpackComponent component, int size) {
+        if (size <= 0) {
+            return component;
+        }
+
+        if (component == null) {
+            return new BackpackComponent(createEmptyContents(size));
+        }
+
+        List<ItemStack> stacks = component.stacks();
+        if (stacks.size() == size) {
+            return component;
+        }
+
+        List<ItemStack> resized = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            resized.add(i < stacks.size() ? stacks.get(i) : ItemStack.EMPTY);
+        }
+        return new BackpackComponent(resized);
+    }
+
+    private static List<ItemStack> createEmptyContents(int size) {
+        List<ItemStack> empty = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            empty.add(ItemStack.EMPTY);
+        }
+        return empty;
     }
 
     public static ResourceLocation id(String name) {

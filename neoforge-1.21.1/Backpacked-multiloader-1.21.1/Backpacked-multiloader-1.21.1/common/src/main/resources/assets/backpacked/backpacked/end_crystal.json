@@ -1,0 +1,190 @@
+{
+    "shelf_offset": [0, -1, 0],
+    "bobbing": false,
+    "gui_display": {
+        "rotation": [30, 30, 0],
+        "translation": [-1.75, 4.75, 0],
+        "scale": [1.4, 1.4, 1.4]
+    },
+    "renderer": {
+        "type": "backpacked:advanced",
+        "functions": [
+            {
+                "type": "backpacked:draw_model",
+                "model": "backpacked:backpacked/end_crystal"
+            },
+            {
+                "type": "backpacked:push_matrix",
+                "functions": [
+                    {
+                        "type": "backpacked:translate_matrix",
+                        "y": {
+                            "type": "backpacked:and",
+                            "first": {
+                                "type": "backpacked:waveform",
+                                "waveform": "sine",
+                                "wavelength": 20
+                            },
+                            "second": 0.0625,
+                            "op": "multiply"
+                        },
+                        "z": {
+                            "type": "backpacked:and",
+                            "first": {
+                                "type": "backpacked:entity_data",
+                                "property": "walk_speed"
+                            },
+                            "second": 0.1,
+                            "op": "multiply"
+                        }
+                    },
+                    {
+                        "type": "backpacked:push_matrix",
+                        "functions": [
+                            {
+                                "type": "backpacked:translate_matrix",
+                                "y": -0.1875,
+                                "z": 0.328125
+                            },
+                            {
+                                "type": "backpacked:scale_matrix",
+                                "x": {
+                                    "type": "backpacked:and",
+                                    "first": 1.0,
+                                    "second": {
+                                        "type": "backpacked:and",
+                                        "first": {
+                                            "type": "backpacked:entity_data",
+                                            "property": "walk_speed"
+                                        },
+                                        "second": 0.25,
+                                        "op": "multiply"
+                                    }
+                                },
+                                "y": {
+                                    "type": "backpacked:and",
+                                    "first": 1.0,
+                                    "second": {
+                                        "type": "backpacked:and",
+                                        "first": {
+                                            "type": "backpacked:entity_data",
+                                            "property": "walk_speed"
+                                        },
+                                        "second": 0.25,
+                                        "op": "multiply"
+                                    }
+                                },
+                                "z": {
+                                    "type": "backpacked:and",
+                                    "first": 1.0,
+                                    "second": {
+                                        "type": "backpacked:and",
+                                        "first": {
+                                            "type": "backpacked:entity_data",
+                                            "property": "walk_speed"
+                                        },
+                                        "second": 0.25,
+                                        "op": "multiply"
+                                    }
+                                }
+                            },
+                            {
+                                "type": "backpacked:translate_matrix",
+                                "y": 0.1875,
+                                "z": -0.328125
+                            },
+                            {
+                                "type": "backpacked:draw_model",
+                                "model": "backpacked:backpacked/end_crystal_inner"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "backpacked:translate_matrix",
+                        "y": -0.1875,
+                        "z": 0.328125
+                    },
+                    {
+                        "type": "backpacked:rotate_matrix",
+                        "y": {
+                            "type": "backpacked:and",
+                            "first": {  
+                                "type": "backpacked:tick_count"
+                            },
+                            "second": 3,
+                            "op": "multiply"
+                        }
+                    },
+                    {
+                        "type": "backpacked:rotate_matrix",
+                        "y": {
+                            "type": "backpacked:and",
+                            "first": {
+                                "type": "backpacked:entity_data",
+                                "property": "walk_position"
+                            },
+                            "second": 8,
+                            "op": "multiply"
+                        }
+                    },
+                    {
+                        "type": "backpacked:rotate_matrix",
+                        "x": 45,
+                        "z": 30
+                    },
+                    {
+                        "type": "backpacked:scale_matrix",
+                        "x": {
+                            "type": "backpacked:and",
+                            "first": 1.0,
+                            "second": {
+                                "type": "backpacked:and",
+                                "first": {
+                                    "type": "backpacked:entity_data",
+                                    "property": "walk_speed"
+                                },
+                                "second": 0.25,
+                                "op": "multiply"
+                            }
+                        },
+                        "y": {
+                            "type": "backpacked:and",
+                            "first": 1.0,
+                            "second": {
+                                "type": "backpacked:and",
+                                "first": {
+                                    "type": "backpacked:entity_data",
+                                    "property": "walk_speed"
+                                },
+                                "second": 0.25,
+                                "op": "multiply"
+                            }
+                        },
+                        "z": {
+                            "type": "backpacked:and",
+                            "first": 1.0,
+                            "second": {
+                                "type": "backpacked:and",
+                                "first": {
+                                    "type": "backpacked:entity_data",
+                                    "property": "walk_speed"
+                                },
+                                "second": 0.25,
+                                "op": "multiply"
+                            }
+                        }
+                    },
+                    {
+                        "type": "backpacked:translate_matrix",
+                        "y": 0.1875,
+                        "z": -0.328125
+                    },
+                    {
+                        "type": "backpacked:draw_model",
+                        "model": "backpacked:backpacked/end_crystal_frame"
+                    }
+                ]
+            }
+        ]
+    }
+}

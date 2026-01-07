@@ -1,5 +1,9 @@
 package draylar.inmis;
 
+import draylar.inmis.command.BackpackedConversionCommand;
+import draylar.inmis.compat.BackpackedDataImporter;
+import draylar.inmis.compat.BackpackedImportController;
+import draylar.inmis.compat.BackpackedMigrationManager;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.config.ConfigManager;
 import draylar.inmis.config.InmisConfig;
@@ -23,7 +27,9 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameRules;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
@@ -73,6 +79,7 @@ public class Inmis {
 
     public Inmis() {
         CONFIG = ConfigManager.load();
+        BackpackedMigrationManager.bootstrapFromConfig();
 
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ITEMS.register(modBus);
@@ -180,10 +187,20 @@ public class Inmis {
                 }
             }
         }
+
+        @SubscribeEvent
+        public static void registerCommands(RegisterCommandsEvent event) {
+            BackpackedConversionCommand.register(event.getDispatcher());
+        }
+
+        @SubscribeEvent
+        public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+            BackpackedMigrationManager.onPlayerLogin(event);
+        }
     }
 
     public static boolean isBackpackEmpty(ItemStack stack) {
-        ListTag tag = stack.getOrCreateTag().getList("Inventory", Tag.TAG_COMPOUND);
+        ListTag tag = getOrCreateInventory(stack);
 
         for (Tag element : tag) {
             CompoundTag stackTag = (CompoundTag) element;
@@ -198,7 +215,7 @@ public class Inmis {
 
     public static List<ItemStack> getBackpackContents(ItemStack stack) {
         List<ItemStack> stacks = new ArrayList<>();
-        ListTag tag = stack.getOrCreateTag().getList("Inventory", Tag.TAG_COMPOUND);
+        ListTag tag = getOrCreateInventory(stack);
 
         for (Tag element : tag) {
             CompoundTag stackTag = (CompoundTag) element;
@@ -211,6 +228,25 @@ public class Inmis {
 
     public static void wipeBackpack(ItemStack stack) {
         stack.getOrCreateTag().remove("Inventory");
+    }
+
+    public static ListTag getOrCreateInventory(ItemStack stack) {
+        if (stack.getItem() instanceof BackpackItem backpackItem) {
+            return getOrCreateInventory(stack, backpackItem.getTier());
+        }
+
+        return stack.getOrCreateTag().getList("Inventory", Tag.TAG_COMPOUND);
+    }
+
+    public static ListTag getOrCreateInventory(ItemStack stack, BackpackInfo tier) {
+        if (tier != null && BackpackedImportController.isImportEnabled()) {
+            ListTag imported = BackpackedDataImporter.tryImport(stack, tier);
+            if (imported != null) {
+                stack.getOrCreateTag().put("Inventory", imported);
+            }
+        }
+
+        return stack.getOrCreateTag().getList("Inventory", Tag.TAG_COMPOUND);
     }
 
     public static ResourceLocation id(String name) {

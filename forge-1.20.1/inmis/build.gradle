@@ -5,7 +5,7 @@ plugins {
 }
 
 group = project.maven_group
-version = "${project.mod_version}-${project.minecraft_version}"
+version = "${project.fabric_version}-${project.mod_version}-${project.minecraft_version}"
 archivesBaseName = project.archives_base_name
 
 java {
@@ -75,6 +75,10 @@ processResources {
 
     filesMatching("META-INF/mods.toml") {
         expand "version": project.version, "minecraft_version": project.minecraft_version
+    }
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
     }
 }
 

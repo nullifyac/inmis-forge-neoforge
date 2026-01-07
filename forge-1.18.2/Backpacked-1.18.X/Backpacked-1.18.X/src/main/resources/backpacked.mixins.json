@@ -1,0 +1,25 @@
+{
+    "required": true,
+    "package": "com.mrcrayfish.backpacked.mixin",
+    "compatibilityLevel": "JAVA_8",
+    "minVersion": "0.8",
+    "refmap": "backpacked.refmap.json",
+    "mixins": [
+        "common.BeehiveBlockMixin",
+        "common.BlockMixin",
+        "common.BredAnimalsTriggerMixin",
+        "common.ComposterBlockMixin",
+        "common.EntityMixin",
+        "common.ItemEntityMixin",
+        "common.LockableLootTileEntityMixin",
+        "common.PandaEntityMixin",
+        "common.PlayerEntityMixin",
+        "common.PlayerInteractionManagerMixin",
+        "common.PlayerInventoryMixin",
+        "common.ServerPlayNetHandlerMixin",
+        "common.SheepEntityMixin"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    }
+}

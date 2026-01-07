@@ -28,7 +28,7 @@ side="BOTH"
 [[dependencies.inmis]]
 modId="curios"
 mandatory=false
-versionRange="[1.19.2-5.1.6.4,)"
+versionRange="[1.19.2-5.1.4.2,)"
 ordering="NONE"
 side="BOTH"
 

@@ -55,6 +55,15 @@ cd forge-1.20.1/inmis
 
 The compiled mod will be available in `build/libs/`.
 
+### Versioning Scheme
+
+Each published JAR now follows `inmis-<fabricVersion>-<forkVersion>-<minecraftVersion>.jar`:
+- `fabricVersion` denotes the upstream Fabric release the port is based on.
+- `forkVersion` tracks fixes unique to this Forge/NeoForge line.
+- `minecraftVersion` indicates the supported game build.
+
+Example: `inmis-2.7.2-2.7.3-1.20.1.jar` is the Forge 1.20.1 port derived from Fabric 2.7.2 with the third patch of our fork applied.
+
 ## Features
 
 ### Core Functionality
@@ -73,6 +82,20 @@ Customize gameplay through `config/inmis.json`:
 - Require players to wear backpacks in armor slots
 - Add custom backpacks with custom properties
 - Adjust inventory sizes and features
+- Enable automatic import of Backpacked inventories via `importBackpackedItems`
+ - Enable automatic import of Backpacked inventories via `importBackpackedItems`
+ - Fine-tune automatic conversion defaults with `autoBackpackedTier`, `autoBackpackedColumns`, `autoBackpackedRows`, and `autoBackpackedAllowSmaller`
+ - Automatically block Backpacked crafting recipes while the importer is enabled, preventing new legacy stacks from entering the world
+
+## Migrating from Backpacked
+
+Servers and single-player worlds that previously used [MrCrayfish's Backpacked](https://github.com/MrCrayfish/Backpacked/) can now migrate their saves without datapacks or external scripts. Every maintained build (NeoForge 1.21.1 and Forge 1.18.2–1.20.1) ships with both an automatic login migrator and the `/inmis convert_backpacked` helper.
+
+1. Enable `"importBackpackedItems": true` inside `config/inmis.json`. This flag lets Inmis read the legacy `Items` tag once the stack becomes an Inmis backpack and also toggles automatic migration.
+2. Configure the automatic migrator with `autoBackpackedTier`, `autoBackpackedColumns`, `autoBackpackedRows`, and `autoBackpackedAllowSmaller`. When enabled, every player login is scanned (main inventory, armor, offhand, Ender Chest, and Curios back slot). Matching `backpacked:backpack` stacks are swapped to the configured Inmis tier while retaining **all** NBT, then Inmis copies the Backpacked `Items` list as soon as those stacks are accessed. While the importer is on, Inmis also removes Backpacked crafting recipes so no new legacy backpacks appear.
+3. Optional: Run `/inmis convert_backpacked <targets> <tier> <columns> <rows> [allow_smaller]` if you want to migrate specific players, target a different tier than your automatic default, or perform a one-time conversion before the next login. Arguments mirror the Backpacked config (`inventorySizeColumns` / `inventorySizeRows`) to keep slot counts consistent.
+
+If `importBackpackedItems` is disabled, Inmis behaves exactly as before. Leave it on until every known stack has been converted, then switch it back off to skip the extra tag checks and re-enable Backpacked recipes.
 
 ## Version-Specific Details
 

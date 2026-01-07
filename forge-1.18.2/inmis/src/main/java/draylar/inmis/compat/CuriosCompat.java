@@ -19,6 +19,8 @@ import top.theillusivec4.curios.common.capability.CurioItemCapability;
 import top.theillusivec4.curios.common.capability.ItemizedCurioCapability;
 
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 public final class CuriosCompat {
 
@@ -130,6 +132,24 @@ public final class CuriosCompat {
                 CuriosApi.getCuriosHelper().setEquippedCurio(player, result.slotContext().identifier(), result.slotContext().index(), ItemStack.EMPTY);
             }
         });
+    }
+
+    public static int replaceMatchingStacks(Player player, Predicate<ItemStack> matcher, UnaryOperator<ItemStack> converter) {
+        return CuriosApi.getCuriosHelper().getCuriosHandler(player)
+                .map(handler -> {
+                    List<SlotResult> curios = CuriosApi.getCuriosHelper().findCurios(player, matcher::test);
+                    int converted = 0;
+                    for (SlotResult result : curios) {
+                        ItemStack replacement = converter.apply(result.stack());
+                        if (replacement != null && !replacement.isEmpty()) {
+                            CuriosApi.getCuriosHelper().setEquippedCurio(player,
+                                    result.slotContext().identifier(), result.slotContext().index(), replacement);
+                            converted++;
+                        }
+                    }
+                    return converted;
+                })
+                .orElse(0);
     }
 
 }
