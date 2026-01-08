@@ -121,7 +121,7 @@ inmis/
 
 ## License
 
-Inmis is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
+Inmis is licensed under the **MIT License**.
 
 ## Contributing
 
