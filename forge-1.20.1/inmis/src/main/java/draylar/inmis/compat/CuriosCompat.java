@@ -55,6 +55,9 @@ public final class CuriosCompat {
             CuriosApi.registerCurio(backpack.get(), BACKPACK_CURIO);
         }
         CuriosApi.registerCurio(Inmis.ENDER_POUCH.get(), ENDER_POUCH_CURIO);
+        CuriosApi.registerCurioPredicate(Inmis.id("backpack"), slotResult ->
+                BACK_SLOT.equals(slotResult.slotContext().identifier())
+                        && (slotResult.stack().getItem() instanceof BackpackItem || slotResult.stack().getItem() == Inmis.ENDER_POUCH.get()));
     }
 
     public static ItemStack findFirstEquippedBackpack(Player player) {
@@ -68,6 +71,19 @@ public final class CuriosCompat {
                 .findFirstCurio(stack -> stack.getItem() instanceof BackpackItem)
                 .map(SlotResult::stack)
                 .orElse(ItemStack.EMPTY);
+    }
+
+    public static List<ItemStack> getEquippedBackpacks(Player player) {
+        return CuriosApi.getCuriosInventory(player).resolve()
+                .map(handler -> {
+                    List<SlotResult> curios = handler.findCurios(stack -> stack.getItem() instanceof BackpackItem);
+                    List<ItemStack> stacks = new java.util.ArrayList<>(curios.size());
+                    for (SlotResult result : curios) {
+                        stacks.add(result.stack());
+                    }
+                    return stacks;
+                })
+                .orElse(List.of());
     }
 
     public static boolean tryEquipBackpack(Player player, ItemStack stack) {

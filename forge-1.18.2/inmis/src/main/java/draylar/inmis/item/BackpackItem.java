@@ -1,9 +1,14 @@
 package draylar.inmis.item;
 
 import draylar.inmis.Inmis;
+import draylar.inmis.augment.BackpackAugmentType;
+import draylar.inmis.augment.BackpackAugments;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.ui.BackpackScreenHandler;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -13,15 +18,18 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.network.NetworkHooks;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 public class BackpackItem extends Item {
 
@@ -34,7 +42,6 @@ public class BackpackItem extends Item {
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player user, InteractionHand hand) {
-        ItemStack stack = user.getItemInHand(hand);
         if (!Inmis.CONFIG.requireArmorTrinketToOpen) {
             if (Inmis.CONFIG.playSound) {
                 if (level.isClientSide) {
@@ -45,30 +52,36 @@ public class BackpackItem extends Item {
                 }
             }
 
-            openScreen(user, stack);
-            return InteractionResultHolder.success(stack);
+            openScreen(user, user.getItemInHand(hand));
+            return InteractionResultHolder.success(user.getItemInHand(hand));
         }
 
-        if (Inmis.CONFIG.allowBackpacksInChestplate) {
-            ItemStack equipped = user.getItemBySlot(EquipmentSlot.CHEST);
-            if (equipped.isEmpty()) {
-                if (!level.isClientSide) {
-                    ItemStack toEquip = stack.copy();
-                    toEquip.setCount(1);
-                    user.setItemSlot(EquipmentSlot.CHEST, toEquip);
-                    if (!user.getAbilities().instabuild) {
-                        stack.shrink(1);
-                    }
+        return InteractionResultHolder.pass(user.getItemInHand(hand));
+    }
+
+    @Override
+    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
+        super.appendHoverText(stack, level, tooltip, flag);
+        List<BackpackAugmentType> unlocks = BackpackAugments.getTierUnlocks(backpack);
+        if (!unlocks.isEmpty()) {
+            MutableComponent list = new TextComponent("");
+            for (int i = 0; i < unlocks.size(); i++) {
+                if (i > 0) {
+                    list = list.append(", ");
                 }
-                return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+                list = list.append(unlocks.get(i).label());
             }
+            tooltip.add(new TranslatableComponent("inmis.tooltip.unlocks", list).withStyle(ChatFormatting.GRAY));
+        } else {
+            tooltip.add(new TranslatableComponent("inmis.tooltip.unlocks.none").withStyle(ChatFormatting.GRAY));
         }
-
-        return InteractionResultHolder.pass(stack);
     }
 
     public static void openScreen(Player player, ItemStack backpackItemStack) {
         if (!player.level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+            if (backpackItemStack.getItem() instanceof BackpackItem backpackItem) {
+                Inmis.getOrCreateAugments(backpackItemStack, backpackItem.getTier());
+            }
             NetworkHooks.openGui(serverPlayer, new MenuProvider() {
                 @Override
                 public Component getDisplayName() {
@@ -85,6 +98,10 @@ public class BackpackItem extends Item {
 
     public BackpackInfo getTier() {
         return backpack;
+    }
+
+    public EquipmentSlot getEquipmentSlot() {
+        return Inmis.CONFIG.allowBackpacksInChestplate ? EquipmentSlot.CHEST : EquipmentSlot.MAINHAND;
     }
 
     @Override

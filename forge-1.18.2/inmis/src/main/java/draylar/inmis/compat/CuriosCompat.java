@@ -81,6 +81,16 @@ public final class CuriosCompat {
                 .orElse(ItemStack.EMPTY);
     }
 
+    public static List<ItemStack> getEquippedBackpacks(Player player) {
+        List<SlotResult> curios = CuriosApi.getCuriosHelper()
+                .findCurios(player, stack -> stack.getItem() instanceof BackpackItem);
+        List<ItemStack> stacks = new java.util.ArrayList<>(curios.size());
+        for (SlotResult result : curios) {
+            stacks.add(result.stack());
+        }
+        return stacks;
+    }
+
     public static boolean tryEquipBackpack(Player player, ItemStack stack) {
         if (stack.isEmpty()) {
             return false;

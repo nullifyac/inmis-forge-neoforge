@@ -1,9 +1,13 @@
 package draylar.inmis.item;
 
 import draylar.inmis.Inmis;
+import draylar.inmis.augment.BackpackAugmentType;
+import draylar.inmis.augment.BackpackAugments;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.ui.BackpackScreenHandler;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -18,10 +22,13 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.Equipable;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.network.NetworkHooks;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 public class BackpackItem extends Item implements Equipable {
 
@@ -51,8 +58,29 @@ public class BackpackItem extends Item implements Equipable {
         return InteractionResultHolder.pass(user.getItemInHand(hand));
     }
 
+    @Override
+    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
+        super.appendHoverText(stack, level, tooltip, flag);
+        List<BackpackAugmentType> unlocks = BackpackAugments.getTierUnlocks(backpack);
+        if (!unlocks.isEmpty()) {
+            MutableComponent list = Component.empty();
+            for (int i = 0; i < unlocks.size(); i++) {
+                if (i > 0) {
+                    list = list.append(", ");
+                }
+                list = list.append(unlocks.get(i).label());
+            }
+            tooltip.add(Component.translatable("inmis.tooltip.unlocks", list).withStyle(ChatFormatting.GRAY));
+        } else {
+            tooltip.add(Component.translatable("inmis.tooltip.unlocks.none").withStyle(ChatFormatting.GRAY));
+        }
+    }
+
     public static void openScreen(Player player, ItemStack backpackItemStack) {
         if (!player.level().isClientSide && player instanceof ServerPlayer serverPlayer) {
+            if (backpackItemStack.getItem() instanceof BackpackItem backpackItem) {
+                Inmis.getOrCreateAugments(backpackItemStack, backpackItem.getTier());
+            }
             NetworkHooks.openScreen(serverPlayer, new MenuProvider() {
                 @Override
                 public Component getDisplayName() {

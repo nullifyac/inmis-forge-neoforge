@@ -10,14 +10,14 @@ public class ItemStackMixin {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof ItemStack) {
+        if(obj instanceof ItemStack) {
             ItemStack thisStack = (ItemStack) (Object) this;
             ItemStack checkStack = (ItemStack) obj;
 
             Item thisStackItem = thisStack.getItem();
             Item checkStackItem = checkStack.getItem();
 
-            if (thisStackItem instanceof BackpackItem && checkStackItem instanceof BackpackItem) {
+            if(thisStackItem instanceof BackpackItem && checkStackItem instanceof BackpackItem) {
                 return true;
             }
         }

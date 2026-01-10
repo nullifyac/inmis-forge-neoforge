@@ -10,6 +10,7 @@ import draylar.inmis.config.InmisConfig;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.item.DyeableBackpackItem;
 import draylar.inmis.item.EnderBackpackItem;
+import draylar.inmis.item.component.BackpackAugmentsComponent;
 import draylar.inmis.item.component.BackpackComponent;
 import draylar.inmis.network.ServerNetworking;
 import draylar.inmis.ui.BackpackScreenHandler;
@@ -66,6 +67,12 @@ public class Inmis {
             DATA_COMPONENTS.register("backpack", () -> DataComponentType.<BackpackComponent>builder()
                     .persistent(BackpackComponent.CODEC)
                     .networkSynchronized(BackpackComponent.STREAM_CODEC)
+                    .cacheEncoding()
+                    .build());
+    public static final Supplier<DataComponentType<BackpackAugmentsComponent>> BACKPACK_AUGMENTS =
+            DATA_COMPONENTS.register("backpack_augments", () -> DataComponentType.<BackpackAugmentsComponent>builder()
+                    .persistent(BackpackAugmentsComponent.CODEC)
+                    .networkSynchronized(BackpackAugmentsComponent.STREAM_CODEC)
                     .cacheEncoding()
                     .build());
 
@@ -281,6 +288,15 @@ public class Inmis {
             empty.add(ItemStack.EMPTY);
         }
         return empty;
+    }
+
+    public static BackpackAugmentsComponent getOrCreateAugments(ItemStack stack, BackpackInfo tier) {
+        BackpackAugmentsComponent component = stack.get(BACKPACK_AUGMENTS.get());
+        if (component == null) {
+            component = BackpackAugmentsComponent.DEFAULT;
+            stack.set(BACKPACK_AUGMENTS.get(), component);
+        }
+        return component;
     }
 
     public static ResourceLocation id(String name) {

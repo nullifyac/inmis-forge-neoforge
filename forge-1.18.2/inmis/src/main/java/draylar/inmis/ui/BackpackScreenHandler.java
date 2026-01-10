@@ -3,21 +3,16 @@ package draylar.inmis.ui;
 import draylar.inmis.Inmis;
 import draylar.inmis.api.Dimension;
 import draylar.inmis.api.Point;
+import draylar.inmis.augment.BackpackInventory;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.item.BackpackItem;
-import draylar.inmis.util.InventoryUtils;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
-import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.ShulkerBoxBlock;
 
 public class BackpackScreenHandler extends AbstractContainerMenu {
 
@@ -46,17 +41,7 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
         BackpackInfo tier = getItem().getTier();
         int rowWidth = tier.getRowWidth();
         int numberOfRows = tier.getNumberOfRows();
-
-        ListTag tag = Inmis.getOrCreateInventory(backpackStack, tier);
-        BackpackInventory inventory = new BackpackInventory(rowWidth * numberOfRows) {
-            @Override
-            public void setChanged() {
-                backpackStack.getOrCreateTag().put("Inventory", InventoryUtils.toTag(this));
-                super.setChanged();
-            }
-        };
-
-        InventoryUtils.fromTag(tag, inventory);
+        BackpackInventory inventory = new BackpackInventory(backpackStack, tier);
 
         for (int y = 0; y < numberOfRows; y++) {
             for (int x = 0; x < rowWidth; x++) {
@@ -76,6 +61,8 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
             Point playerInvSlotPosition = getPlayerInvSlotPosition(dimension, x, 3);
             this.addSlot(new BackpackLockedSlot(playerInventory, x, playerInvSlotPosition.x + 1, playerInvSlotPosition.y + 1));
         }
+
+        inventory.setChanged();
     }
 
     public BackpackItem getItem() {
@@ -152,11 +139,8 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
                 }
             }
 
-            if (Inmis.CONFIG.disableShulkers && container instanceof BackpackInventory) {
-                Item item = stack.getItem();
-                if (item instanceof BlockItem blockItem) {
-                    return !(blockItem.getBlock() instanceof ShulkerBoxBlock);
-                }
+            if (container instanceof BackpackInventory backpackInventory && !backpackInventory.isAllowedItem(stack)) {
+                return false;
             }
 
             return stackMovementIsAllowed(stack);
@@ -164,13 +148,6 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
 
         private boolean stackMovementIsAllowed(ItemStack stack) {
             return !(stack.getItem() instanceof BackpackItem) && stack != backpackStack;
-        }
-    }
-
-    public static class BackpackInventory extends SimpleContainer {
-
-        public BackpackInventory(int slots) {
-            super(slots);
         }
     }
 }

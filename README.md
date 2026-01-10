@@ -12,39 +12,40 @@ This is a port of the original [Fabric version](https://github.com/Draylar/inmis
 Inmis provides players with customizable backpacks that can be:
 - Opened via right-click or keybind (default: **B**)
 - Equipped in the Chestplate armor slot
-- Enhanced with Trinket compatibility for additional equip slots
+- Upgraded with configurable backpack augments
 - Configured through `config/inmis.json` for custom gameplay
 
 ## Repository Structure
 
 ```
 inmis-forge-neoforge/
-├── forge-1.18.2/                   # Minecraft 1.18.2 (Forge)
-│   ├── inmis/                      # Main mod source
-│   ├── Backpacked-1.18.X/          # Backpacked dependency
-│   ├── Curios-1.18.x/              # Curios mod (dependency)
-│   └── release/                    # Built artifacts
-├── forge-1.19.2/                   # Minecraft 1.19.2 (Forge)
-│   ├── inmis/                      # Main mod source
-│   ├── Backpacked-1.19.2/          # Backpacked dependency
-│   ├── Curios-1.19.x/              # Curios mod (dependency)
-│   └── release/                    # Built artifacts
-├── forge-1.20.1/                   # Minecraft 1.20.1 (Forge)
-│   ├── inmis/                      # Main mod source
-│   ├── Backpacked-multiloader-1.20.X/  # Backpacked dependency (multiloader)
-│   ├── Curios-1.20.x/              # Curios mod (dependency)
-│   └── release/                    # Built artifacts
-├── neoforge-1.21.1/                # Minecraft 1.21.1 (NeoForge)
-│   ├── inmis/                      # Main mod source
-│   ├── Backpacked-multiloader-1.21.1/  # Backpacked dependency (multiloader)
-│   ├── Curios-1.21.x/              # Curios mod (dependency)
-│   └── release/                    # Built artifacts
+|-- forge-1.18.2/                   # Minecraft 1.18.2 (Forge)
+|   |-- inmis/                      # Main mod source
+|   |-- Backpacked-1.18.X/          # Backpacked dependency
+|   |-- Curios-1.18.x/              # Curios mod (dependency)
+|   `-- release/                    # Built artifacts
+|-- forge-1.19.2/                   # Minecraft 1.19.2 (Forge)
+|   |-- inmis/                      # Main mod source
+|   |-- Backpacked-1.19.2/          # Backpacked dependency
+|   |-- Curios-1.19.x/              # Curios mod (dependency)
+|   `-- release/                    # Built artifacts
+|-- forge-1.20.1/                   # Minecraft 1.20.1 (Forge)
+|   |-- inmis/                      # Main mod source
+|   |-- Backpacked-multiloader-1.20.X/  # Backpacked dependency (multiloader)
+|   |-- Curios-1.20.x/              # Curios mod (dependency)
+|   `-- release/                    # Built artifacts
+`-- neoforge-1.21.1/                # Minecraft 1.21.1 (NeoForge)
+    |-- inmis/                      # Main mod source
+    |-- Backpacked-multiloader-1.21.1/  # Backpacked dependency (multiloader)
+    |-- Curios-1.21.x/              # Curios mod (dependency)
+    `-- release/                    # Built artifacts
 ```
 
 ## Quick Start
 
 ### Prerequisites
-- Java Development Kit (JDK) 8+ for older versions, JDK 17+ for 1.21.1
+- Java Development Kit (JDK) 17 for 1.18.2-1.20.1
+- Java Development Kit (JDK) 21 for 1.21.1
 - Gradle (included via gradlew)
 
 ### Building a Version
@@ -65,6 +66,11 @@ The compiled mod will be available in `build/libs/`.
 - **Inventory Management**: 27-slot storage in most backpacks
 - **Quick Access**: Default keybind **B** to open the first backpack in inventory
 - **Armor Integration**: Equip backpacks in the chestplate slot
+
+### Backpack Upgrades (Augments)
+- **Toggleable Upgrades**: Per-backpack enable/disable toggles with a dedicated upgrades panel
+- **Upgradeable Skills**: Funnelling, Quiverlink, Farmhand, Lightweaver, Lootbound, Imbued Hide, Immortal, Reforge, Seedflow, Hopper Bridge
+- **Filters and Modes**: Configure allow/disallow filters and behavior per upgrade
 
 ### Compatibility
 - **Curios Mod**: Equip backpacks in dedicated Curio slots for enhanced gameplay
@@ -97,15 +103,15 @@ Latest version with:
 Each version follows the standard Minecraft mod development structure:
 ```
 inmis/
-├── src/
-│   ├── main/
-│   │   ├── java/          # Source code
-│   │   └── resources/     # Assets and configs
-│   └── test/              # Unit tests
-├── assets/                # Textures and UI assets
-├── build.gradle           # Build configuration
-├── gradle.properties      # Gradle properties
-└── settings.gradle        # Gradle settings
+|-- src/
+|   |-- main/
+|   |   |-- java/          # Source code
+|   |   `-- resources/     # Assets and configs
+|   `-- test/              # Unit tests
+|-- assets/                # Textures and UI assets
+|-- build.gradle           # Build configuration
+|-- gradle.properties      # Gradle properties
+`-- settings.gradle        # Gradle settings
 ```
 
 ### Building from Source
@@ -117,11 +123,10 @@ inmis/
 ### Dependencies
 - **Forge/NeoForge**: Modding framework
 - **Curios**: Trinket/accessory system
-- **Fabric API** (if using compatibility layer): Utility functions
 
 ## License
 
-Inmis is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
+Inmis is licensed under the **MIT License**.
 
 ## Contributing
 
@@ -138,10 +143,10 @@ Contributions are welcome! Please consider:
 
 | Version | Modloader | Status | Java |
 |---------|-----------|--------|------|
-| 1.18.2  | Forge     | Active | 8+   |
-| 1.19.2  | Forge     | Active | 17+  |
-| 1.20.1  | Forge     | Active | 17+  |
-| 1.21.1  | NeoForge  | Active | 21+  |
+| 1.18.2  | Forge     | Active | 17   |
+| 1.19.2  | Forge     | Active | 17   |
+| 1.20.1  | Forge     | Active | 17   |
+| 1.21.1  | NeoForge  | Active | 21   |
 
 ---
 

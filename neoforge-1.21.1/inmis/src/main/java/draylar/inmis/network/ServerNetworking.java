@@ -4,6 +4,8 @@ import draylar.inmis.Inmis;
 import draylar.inmis.compat.CuriosCompat;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.item.EnderBackpackItem;
+import draylar.inmis.item.component.BackpackAugmentsComponent;
+import draylar.inmis.ui.BackpackScreenHandler;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -27,10 +29,18 @@ public final class ServerNetworking {
                 OpenBackpackPayload.TYPE,
                 OpenBackpackPayload.STREAM_CODEC,
                 ServerNetworking::handleOpenBackpack);
+        event.registrar("1").playToServer(
+                UpdateBackpackAugmentsPayload.TYPE,
+                UpdateBackpackAugmentsPayload.STREAM_CODEC,
+                ServerNetworking::handleUpdateBackpackAugments);
     }
 
     public static void sendOpenBackpack() {
         PacketDistributor.sendToServer(new OpenBackpackPayload());
+    }
+
+    public static void sendUpdateBackpackAugments(BackpackAugmentsComponent augments) {
+        PacketDistributor.sendToServer(new UpdateBackpackAugmentsPayload(augments));
     }
 
     private static void handleOpenBackpack(OpenBackpackPayload payload, IPayloadContext context) {
@@ -69,6 +79,21 @@ public final class ServerNetworking {
 
             if (findFirstEnderPouch(inventory) != ItemStack.EMPTY) {
                 openEnderPouch(player);
+            }
+        });
+    }
+
+    private static void handleUpdateBackpackAugments(UpdateBackpackAugmentsPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            Player player = context.player();
+            if (player == null) {
+                return;
+            }
+            if (player.containerMenu instanceof BackpackScreenHandler handler) {
+                ItemStack stack = handler.getBackpackStack();
+                if (stack.getItem() instanceof BackpackItem) {
+                    stack.set(Inmis.BACKPACK_AUGMENTS.get(), payload.augments());
+                }
             }
         });
     }

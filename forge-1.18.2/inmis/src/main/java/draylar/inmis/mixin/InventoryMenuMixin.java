@@ -21,7 +21,11 @@ public abstract class InventoryMenuMixin {
             return;
         }
 
-        Slot slot = ((InventoryMenu) (Object) this).getSlot(index);
+        var slots = ((AbstractContainerMenuAccessor) this).inmis$getSlots();
+        if (index < 0 || index >= slots.size()) {
+            return;
+        }
+        Slot slot = slots.get(index);
         if (slot == null || !slot.hasItem()) {
             return;
         }

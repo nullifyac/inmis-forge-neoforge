@@ -3,6 +3,7 @@ package draylar.inmis.network;
 import draylar.inmis.Inmis;
 import draylar.inmis.compat.CuriosCompat;
 import draylar.inmis.item.BackpackItem;
+import draylar.inmis.item.component.BackpackAugmentsComponent;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
@@ -26,10 +27,16 @@ public class ServerNetworking {
     public static void init() {
         int id = 0;
         CHANNEL.registerMessage(id++, OpenBackpackPacket.class, OpenBackpackPacket::encode, OpenBackpackPacket::decode, OpenBackpackPacket::handle);
+        CHANNEL.registerMessage(id++, UpdateBackpackAugmentsPacket.class, UpdateBackpackAugmentsPacket::encode,
+                UpdateBackpackAugmentsPacket::decode, UpdateBackpackAugmentsPacket::handle);
     }
 
     public static void sendOpenBackpack() {
         CHANNEL.sendToServer(new OpenBackpackPacket());
+    }
+
+    public static void sendUpdateBackpackAugments(BackpackAugmentsComponent augments) {
+        CHANNEL.sendToServer(new UpdateBackpackAugmentsPacket(augments));
     }
 
     private static ItemStack findFirstBackpack(List<ItemStack> items) {
@@ -82,6 +89,39 @@ public class ServerNetworking {
 
                 if (!firstBackpackItemStack.isEmpty()) {
                     BackpackItem.openScreen(player, firstBackpackItemStack);
+                }
+            });
+            ctx.setPacketHandled(true);
+        }
+    }
+
+    public static class UpdateBackpackAugmentsPacket {
+        private final BackpackAugmentsComponent augments;
+
+        public UpdateBackpackAugmentsPacket(BackpackAugmentsComponent augments) {
+            this.augments = augments;
+        }
+
+        public static void encode(UpdateBackpackAugmentsPacket msg, FriendlyByteBuf buf) {
+            msg.augments.write(buf);
+        }
+
+        public static UpdateBackpackAugmentsPacket decode(FriendlyByteBuf buf) {
+            return new UpdateBackpackAugmentsPacket(BackpackAugmentsComponent.read(buf));
+        }
+
+        public static void handle(UpdateBackpackAugmentsPacket msg, Supplier<NetworkEvent.Context> ctxSupplier) {
+            NetworkEvent.Context ctx = ctxSupplier.get();
+            ctx.enqueueWork(() -> {
+                ServerPlayer player = ctx.getSender();
+                if (player == null) {
+                    return;
+                }
+                if (player.containerMenu instanceof draylar.inmis.ui.BackpackScreenHandler handler) {
+                    ItemStack stack = handler.getBackpackStack();
+                    if (stack.getItem() instanceof BackpackItem) {
+                        Inmis.setBackpackAugments(stack, msg.augments);
+                    }
                 }
             });
             ctx.setPacketHandled(true);

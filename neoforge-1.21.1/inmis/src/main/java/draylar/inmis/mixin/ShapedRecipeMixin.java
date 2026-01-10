@@ -2,6 +2,7 @@ package draylar.inmis.mixin;
 
 import draylar.inmis.Inmis;
 import draylar.inmis.item.BackpackItem;
+import draylar.inmis.item.component.BackpackAugmentsComponent;
 import draylar.inmis.item.component.BackpackComponent;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.ItemStack;
@@ -46,6 +47,10 @@ public abstract class ShapedRecipeMixin {
                 }
             }
             newBackpack.set(Inmis.BACKPACK_COMPONENT.get(), new BackpackComponent(newContents));
+            BackpackAugmentsComponent augments = centerSlot.get(Inmis.BACKPACK_AUGMENTS.get());
+            if (augments != null) {
+                newBackpack.set(Inmis.BACKPACK_AUGMENTS.get(), augments);
+            }
             cir.setReturnValue(newBackpack);
         }
     }

@@ -9,6 +9,7 @@ import draylar.inmis.config.InmisConfig;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.item.DyeableBackpackItem;
 import draylar.inmis.item.EnderBackpackItem;
+import draylar.inmis.item.component.BackpackAugmentsComponent;
 import draylar.inmis.network.ServerNetworking;
 import draylar.inmis.ui.BackpackScreenHandler;
 import net.minecraft.nbt.CompoundTag;
@@ -47,6 +48,7 @@ public class Inmis {
 
     public static final String MOD_ID = "inmis";
     public static final Logger LOGGER = LogManager.getLogger();
+    private static final String AUGMENTS_KEY = "Augments";
 
     public static final boolean CURIOS_LOADED = ModList.get().isLoaded("curios");
     public static final CreativeModeTab GROUP = CreativeModeTab.TAB_MISC;
@@ -222,6 +224,22 @@ public class Inmis {
         }
 
         return stack.getOrCreateTag().getList("Inventory", Tag.TAG_COMPOUND);
+    }
+
+    public static BackpackAugmentsComponent getOrCreateAugments(ItemStack stack, BackpackInfo tier) {
+        CompoundTag tag = stack.getOrCreateTag();
+        BackpackAugmentsComponent component = tag.contains(AUGMENTS_KEY, Tag.TAG_COMPOUND)
+                ? BackpackAugmentsComponent.fromTag(tag.getCompound(AUGMENTS_KEY))
+                : BackpackAugmentsComponent.DEFAULT;
+        tag.put(AUGMENTS_KEY, component.toTag());
+        return component;
+    }
+
+    public static void setBackpackAugments(ItemStack stack, BackpackAugmentsComponent augments) {
+        if (stack.isEmpty()) {
+            return;
+        }
+        stack.getOrCreateTag().put(AUGMENTS_KEY, augments.toTag());
     }
 
     public static ResourceLocation id(String name) {

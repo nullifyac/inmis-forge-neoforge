@@ -44,3 +44,4 @@ bin/
 
 # Ignore generated debug folders
 **/debug/
+.venv
