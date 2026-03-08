@@ -19,6 +19,8 @@ java {
 repositories {
     mavenCentral()
     maven { url = 'https://maven.theillusivec4.top/' }
+    maven { url = 'https://maven.wispforest.io/releases' }
+    maven { url = 'https://maven.su5ed.dev/releases' }
 }
 
 neoForge {
@@ -44,6 +46,7 @@ neoForge {
 
 dependencies {
     compileOnly "top.theillusivec4.curios:curios-neoforge:${project.curios_version}"
+    compileOnly "io.wispforest:accessories-neoforge:${project.accessories_version}"
 }
 
 processResources {
@@ -52,13 +55,15 @@ processResources {
     inputs.property "neoforge_version", project.neoforge_version
     inputs.property "curios_version", project.curios_version
     inputs.property "curios_version_range", project.curios_version_range
+    inputs.property "accessories_version_range", project.accessories_version_range
 
     filesMatching("META-INF/neoforge.mods.toml") {
         expand "version": project.version,
                 "minecraft_version": project.minecraft_version,
                 "neoforge_version": project.neoforge_version,
                 "curios_version": project.curios_version,
-                "curios_version_range": project.curios_version_range
+                "curios_version_range": project.curios_version_range,
+                "accessories_version_range": project.accessories_version_range
     }
 }
 

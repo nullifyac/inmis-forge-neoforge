@@ -348,9 +348,18 @@ public class BackpackHandledScreen extends AbstractContainerScreen<BackpackScree
         if (isWithin(mouseX, mouseY, layout.contentX, y, this.font.width(useFilters), 10)) {
             setTooltipForNextRenderPass(Component.translatable("augment.backpacked.seedflow.use_filters.tooltip"));
         }
-        y += 12;
-        graphics.drawString(this.font, FILTERS_LABEL, layout.contentX, y, 0xFFD8C6B2, false);
-        renderFilterGrid(graphics, layout, y + 10, settings.filters(), mouseX, mouseY);
+        int filtersY = y + TEXT_LINE_HEIGHT;
+        graphics.drawString(this.font, FILTERS_LABEL, layout.contentX, filtersY, 0xFFD8C6B2, false);
+        int setFiltersY = filtersY + TEXT_LINE_HEIGHT;
+        int setFiltersColor = isWithin(mouseX, mouseY, layout.contentX, setFiltersY, this.font.width(SET_FILTERS_LABEL), 10)
+                ? 0xFFE0CDB7
+                : 0xFFD8C6B2;
+        graphics.drawString(this.font, SET_FILTERS_LABEL, layout.contentX, setFiltersY, setFiltersColor, false);
+        if (isWithin(mouseX, mouseY, layout.contentX, setFiltersY, this.font.width(SET_FILTERS_LABEL), 10)) {
+            setTooltipForNextRenderPass(Component.translatable("inmis.gui.set_filters.tooltip"));
+        }
+        int gridY = setFiltersY + TEXT_LINE_HEIGHT;
+        renderFilterGrid(graphics, layout, gridY, settings.filters(), mouseX, mouseY);
     }
 
     private void renderHopperBridgeSettings(GuiGraphics graphics, SettingsLayout layout, int startY, int mouseX, int mouseY,
@@ -490,7 +499,15 @@ public class BackpackHandledScreen extends AbstractContainerScreen<BackpackScree
                     applyAugments(augments.withSeedflow(augments.seedflow().withUseFilters(!augments.seedflow().useFilters())));
                     return true;
                 }
-                return handleFilterClick(layout, y + 22, augments.seedflow().filters(), button, selectedAugment, mouseX, mouseY);
+                int filtersY = y + TEXT_LINE_HEIGHT;
+                int setFiltersY = filtersY + TEXT_LINE_HEIGHT;
+                if (isWithin(mouseX, mouseY, layout.contentX, setFiltersY, this.font.width(SET_FILTERS_LABEL), 10)) {
+                    applyAugments(augments.withSeedflow(augments.seedflow().withFilters(buildFiltersFromBackpack())));
+                    filterPage = 0;
+                    return true;
+                }
+                int gridY = setFiltersY + TEXT_LINE_HEIGHT;
+                return handleFilterClick(layout, gridY, augments.seedflow().filters(), button, selectedAugment, mouseX, mouseY);
             }
             case HOPPER_BRIDGE -> {
                 if (isWithin(mouseX, mouseY, layout.toggleX, y, TOGGLE_SIZE, TOGGLE_SIZE)) {

@@ -1,6 +1,7 @@
 package draylar.inmis.network;
 
 import draylar.inmis.Inmis;
+import draylar.inmis.compat.AccessoriesCompat;
 import draylar.inmis.compat.CuriosCompat;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.item.EnderBackpackItem;
@@ -48,6 +49,14 @@ public final class ServerNetworking {
             Player player = context.player();
             if (player == null) {
                 return;
+            }
+
+            if (Inmis.ACCESSORIES_LOADED && Inmis.CONFIG.enableTrinketCompatibility) {
+                ItemStack accessoryBackpack = AccessoriesCompat.findFirstEquippedBackpack(player);
+                if (!accessoryBackpack.isEmpty()) {
+                    BackpackItem.openScreen(player, accessoryBackpack);
+                    return;
+                }
             }
 
             if (Inmis.CURIOS_LOADED && Inmis.CONFIG.enableTrinketCompatibility) {

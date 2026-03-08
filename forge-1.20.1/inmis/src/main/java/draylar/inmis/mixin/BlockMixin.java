@@ -30,7 +30,6 @@ public abstract class BlockMixin {
             return;
         }
 
-        BackpackAugmentHandler.onBlockBroken(player, state, pos);
         if (!BackpackAugmentHandler.hasLootboundBackpacks(player)) {
             return;
         }

@@ -22,6 +22,7 @@ import java.util.function.UnaryOperator;
 public final class CuriosCompat {
 
     private static final String BACK_SLOT = "back";
+    private static boolean registered = false;
 
     private static final ICurioItem BACKPACK_CURIO = new ICurioItem() {
         @Override
@@ -49,6 +50,11 @@ public final class CuriosCompat {
     }
 
     public static void registerCurios() {
+        if (registered) {
+            return;
+        }
+        registered = true;
+
         for (var backpack : Inmis.BACKPACKS) {
             CuriosApi.registerCurio(backpack.get(), BACKPACK_CURIO);
         }
@@ -79,6 +85,9 @@ public final class CuriosCompat {
     }
 
     public static boolean tryEquipBackpack(Player player, ItemStack stack) {
+        if (player.level().isClientSide) {
+            return false;
+        }
         if (stack.isEmpty()) {
             return false;
         }

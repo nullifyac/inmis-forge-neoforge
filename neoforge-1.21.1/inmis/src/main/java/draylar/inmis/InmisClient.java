@@ -2,6 +2,7 @@ package draylar.inmis;
 
 import draylar.inmis.client.BackpackFeature;
 import draylar.inmis.client.InmisKeybinds;
+import draylar.inmis.compat.AccessoriesClientCompat;
 import draylar.inmis.compat.CuriosClientCompat;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.item.DyeableBackpackItem;
@@ -36,6 +37,9 @@ public class InmisClient {
 
         if (Inmis.CURIOS_LOADED && Inmis.CONFIG.enableTrinketCompatibility) {
             event.enqueueWork(CuriosClientCompat::registerRenderers);
+        }
+        if (Inmis.ACCESSORIES_LOADED && Inmis.CONFIG.enableTrinketCompatibility) {
+            event.enqueueWork(AccessoriesClientCompat::registerRenderers);
         }
     }
 

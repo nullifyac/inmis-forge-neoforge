@@ -13,22 +13,29 @@ logoFile="assets/inmis/icon.png"
 
 [[dependencies.inmis]]
 modId="neoforge"
-mandatory=true
+type="required"
 versionRange="[21.1,)"
 ordering="NONE"
 side="BOTH"
 
 [[dependencies.inmis]]
 modId="minecraft"
-mandatory=true
+type="required"
 versionRange="[${minecraft_version},1.22)"
 ordering="NONE"
 side="BOTH"
 
 [[dependencies.inmis]]
 modId="curios"
-mandatory=false
+type="optional"
 versionRange="[${curios_version_range},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.inmis]]
+modId="accessories"
+type="optional"
+versionRange="[${accessories_version_range},)"
 ordering="NONE"
 side="BOTH"
 

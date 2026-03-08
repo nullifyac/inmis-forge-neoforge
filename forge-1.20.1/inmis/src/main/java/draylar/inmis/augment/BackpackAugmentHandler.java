@@ -23,11 +23,14 @@ import net.minecraft.world.item.ProjectileWeaponItem;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -216,19 +219,35 @@ public final class BackpackAugmentHandler {
         if (seedItem == null) {
             return;
         }
+        if (tryReplantCrop(player, pos, seedItem)) {
+            return;
+        }
+        ServerLevel level = player.serverLevel();
+        if (!isReplaceable(level, pos)) {
+            BlockPos targetPos = new BlockPos(pos);
+            level.getServer().execute(() -> tryReplantCrop(player, targetPos, seedItem));
+        }
+    }
+
+    private static boolean tryReplantCrop(ServerPlayer player, BlockPos pos, Item seedItem) {
+        ServerLevel level = player.serverLevel();
+        if (!isReplaceable(level, pos)) {
+            return false;
+        }
         for (BackpackSnapshot snapshot : getSnapshotsWithAugment(player, BackpackAugmentType.FARMHAND)) {
             BackpackInventory inventory = snapshot.inventory();
             ItemStack seed = inventory.findFirst(stack -> stack.is(seedItem));
             if (seed.isEmpty()) {
                 continue;
             }
-            if (!plantSeed(player.serverLevel(), player, seed, pos)) {
+            if (!plantSeed(level, player, seed, pos)) {
                 continue;
             }
             seed.shrink(1);
             inventory.setChanged();
-            break;
+            return true;
         }
+        return false;
     }
 
     private static void handleLightweaver(ServerPlayer player, BlockPos pos, int brightness) {
@@ -252,11 +271,20 @@ public final class BackpackAugmentHandler {
     }
 
     private static void handleSeedflow(ServerPlayer player, BlockPos pos) {
+        ServerLevel level = player.serverLevel();
         List<BlockPos> positions = new ArrayList<>();
-        positions.add(pos.offset(0, 0, 0));
-        positions.add(pos.offset(1, 0, 0));
-        positions.add(pos.offset(0, 0, 1));
-        positions.add(pos.offset(1, 0, 1));
+        Vec3 forward = player.getForward().multiply(1, 0, 1);
+        if (forward.lengthSqr() <= 1.0E-6) {
+            forward = new Vec3(0, 0, 1);
+        } else {
+            forward = forward.normalize();
+        }
+        Vec3 scanOrigin = player.position().add(forward);
+        positions.add(BlockPos.containing(scanOrigin.x - 0.5, scanOrigin.y + 0.5, scanOrigin.z - 0.5));
+        positions.add(BlockPos.containing(scanOrigin.x + 0.5, scanOrigin.y + 0.5, scanOrigin.z - 0.5));
+        positions.add(BlockPos.containing(scanOrigin.x + 0.5, scanOrigin.y + 0.5, scanOrigin.z + 0.5));
+        positions.add(BlockPos.containing(scanOrigin.x - 0.5, scanOrigin.y + 0.5, scanOrigin.z + 0.5));
+        positions.removeIf(targetPos -> !isValidSeedflowTarget(level, targetPos));
 
         for (BackpackSnapshot snapshot : getSnapshotsWithAugment(player, BackpackAugmentType.SEEDFLOW)) {
             if (positions.isEmpty()) {
@@ -265,8 +293,8 @@ public final class BackpackAugmentHandler {
             BackpackAugmentsComponent.SeedflowSettings settings = snapshot.augments().seedflow();
             BackpackInventory inventory = snapshot.inventory();
             Function<BlockPos, ItemStack> seedSupplier = settings.randomizeSeeds()
-                    ? randomSeedSupplier(player.serverLevel(), settings, inventory)
-                    : sequentialSeedSupplier(player.serverLevel(), settings, inventory);
+                    ? randomSeedSupplier(level, settings, inventory)
+                    : sequentialSeedSupplier(level, settings, inventory);
 
             boolean changed = false;
             Iterator<BlockPos> iterator = positions.iterator();
@@ -276,7 +304,7 @@ public final class BackpackAugmentHandler {
                 if (seed.isEmpty()) {
                     break;
                 }
-                if (plantSeed(player.serverLevel(), player, seed, targetPos)) {
+                if (plantSeed(level, player, seed, targetPos)) {
                     seed.shrink(1);
                     iterator.remove();
                     changed = true;
@@ -299,10 +327,13 @@ public final class BackpackAugmentHandler {
                 if (stack.isEmpty()) {
                     continue;
                 }
-                if (!isPlantableSeed(stack.getItem())) {
+                if (!isSeedflowPlantable(stack.getItem())) {
                     continue;
                 }
                 if (settings.useFilters() && !isFilterMatch(stack, settings.filters())) {
+                    continue;
+                }
+                if (!canPlaceCropSeedAt(level, stack, pos)) {
                     continue;
                 }
                 return stack;
@@ -320,10 +351,13 @@ public final class BackpackAugmentHandler {
                 if (stack.isEmpty()) {
                     continue;
                 }
-                if (!isPlantableSeed(stack.getItem())) {
+                if (!isSeedflowPlantable(stack.getItem())) {
                     continue;
                 }
                 if (settings.useFilters() && !isFilterMatch(stack, settings.filters())) {
+                    continue;
+                }
+                if (!canPlaceCropSeedAt(level, stack, pos)) {
                     continue;
                 }
                 count++;
@@ -344,11 +378,46 @@ public final class BackpackAugmentHandler {
         return result.consumesAction();
     }
 
-    private static boolean isPlantableSeed(Item item) {
+    private static boolean isValidSeedflowTarget(ServerLevel level, BlockPos pos) {
+        return isReplaceable(level, pos);
+    }
+
+    private static boolean isReplaceable(ServerLevel level, BlockPos pos) {
+        return level.getBlockState(pos).canBeReplaced();
+    }
+
+    private static boolean canPlaceCropSeedAt(ServerLevel level, ItemStack stack, BlockPos pos) {
+        if (!(stack.getItem() instanceof BlockItem blockItem)) {
+            return false;
+        }
+        if (!isReplaceable(level, pos)) {
+            return false;
+        }
+        BlockState placement = blockItem.getBlock().defaultBlockState();
+        return placement.canSurvive(level, pos);
+    }
+
+    private static boolean isSeedflowPlantable(Item item) {
         if (!(item instanceof BlockItem blockItem)) {
             return false;
         }
-        return blockItem.getBlock() instanceof BushBlock;
+        return isAgeableCrop(blockItem.getBlock());
+    }
+
+    private static boolean isAgeableCrop(Block block) {
+        if (!(block instanceof BushBlock) || block instanceof SaplingBlock) {
+            return false;
+        }
+        if (block instanceof CropBlock) {
+            return true;
+        }
+        BlockState cropState = block.defaultBlockState();
+        for (Property<?> property : cropState.getProperties()) {
+            if (property instanceof IntegerProperty integerProperty && integerProperty.getName().equals("age")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isFilterMatch(ItemStack stack, List<ResourceLocation> filters) {

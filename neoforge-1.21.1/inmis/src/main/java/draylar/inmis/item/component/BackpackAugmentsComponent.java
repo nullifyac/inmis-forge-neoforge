@@ -8,6 +8,15 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BushBlock;
+import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.SaplingBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.level.block.state.properties.Property;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -38,10 +47,10 @@ public record BackpackAugmentsComponent(
             LightweaverSettings.DEFAULT,
             SeedflowSettings.DEFAULT,
             HopperBridgeSettings.DEFAULT,
+            false,
             true,
             true,
-            true,
-            true
+            false
     );
 
     public static final Codec<BackpackAugmentsComponent> CODEC = RecordCodecBuilder.create(builder -> builder.group(
@@ -51,10 +60,10 @@ public record BackpackAugmentsComponent(
             LightweaverSettings.CODEC.optionalFieldOf("lightweaver", LightweaverSettings.DEFAULT).forGetter(BackpackAugmentsComponent::lightweaver),
             SeedflowSettings.CODEC.optionalFieldOf("seedflow", SeedflowSettings.DEFAULT).forGetter(BackpackAugmentsComponent::seedflow),
             HopperBridgeSettings.CODEC.optionalFieldOf("hopper_bridge", HopperBridgeSettings.DEFAULT).forGetter(BackpackAugmentsComponent::hopperBridge),
-            Codec.BOOL.optionalFieldOf("farmhand_enabled", true).forGetter(BackpackAugmentsComponent::farmhandEnabled),
+            Codec.BOOL.optionalFieldOf("farmhand_enabled", false).forGetter(BackpackAugmentsComponent::farmhandEnabled),
             Codec.BOOL.optionalFieldOf("imbued_hide_enabled", true).forGetter(BackpackAugmentsComponent::imbuedHideEnabled),
             Codec.BOOL.optionalFieldOf("immortal_enabled", true).forGetter(BackpackAugmentsComponent::immortalEnabled),
-            Codec.BOOL.optionalFieldOf("reforge_enabled", true).forGetter(BackpackAugmentsComponent::reforgeEnabled)
+            Codec.BOOL.optionalFieldOf("reforge_enabled", false).forGetter(BackpackAugmentsComponent::reforgeEnabled)
     ).apply(builder, BackpackAugmentsComponent::new));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, BackpackAugmentsComponent> STREAM_CODEC =
@@ -163,12 +172,47 @@ public record BackpackAugmentsComponent(
         return List.copyOf(unique);
     }
 
+    private static List<ResourceLocation> sanitizeSeedflowFilters(List<ResourceLocation> filters) {
+        List<ResourceLocation> ids = sanitizeFilters(filters, SEEDFLOW_MAX_FILTERS);
+        if (ids.isEmpty()) {
+            return ids;
+        }
+        List<ResourceLocation> valid = new ArrayList<>();
+        for (ResourceLocation id : ids) {
+            Item item = BuiltInRegistries.ITEM.get(id);
+            if (item != null && isSeedflowPlantableItem(item)) {
+                valid.add(id);
+            }
+        }
+        return List.copyOf(valid);
+    }
+
+    private static boolean isSeedflowPlantableItem(Item item) {
+        if (!(item instanceof BlockItem blockItem)) {
+            return false;
+        }
+        Block block = blockItem.getBlock();
+        if (!(block instanceof BushBlock) || block instanceof SaplingBlock) {
+            return false;
+        }
+        if (block instanceof CropBlock) {
+            return true;
+        }
+        BlockState cropState = block.defaultBlockState();
+        for (Property<?> property : cropState.getProperties()) {
+            if (property instanceof IntegerProperty integerProperty && integerProperty.getName().equals("age")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public record FunnellingSettings(boolean enabled, Mode mode, List<ResourceLocation> filters) {
 
-        public static final FunnellingSettings DEFAULT = new FunnellingSettings(true, Mode.ALLOW, List.of());
+        public static final FunnellingSettings DEFAULT = new FunnellingSettings(false, Mode.ALLOW, List.of());
 
         public static final Codec<FunnellingSettings> CODEC = RecordCodecBuilder.create(builder -> builder.group(
-                Codec.BOOL.optionalFieldOf("enabled", true).forGetter(FunnellingSettings::enabled),
+                Codec.BOOL.optionalFieldOf("enabled", false).forGetter(FunnellingSettings::enabled),
                 Mode.CODEC.optionalFieldOf("mode", Mode.ALLOW).forGetter(FunnellingSettings::mode),
                 ResourceLocation.CODEC.sizeLimitedListOf(FUNNELLING_MAX_FILTERS)
                         .optionalFieldOf("filters", List.of()).forGetter(FunnellingSettings::filters)
@@ -257,10 +301,10 @@ public record BackpackAugmentsComponent(
 
     public record LootboundSettings(boolean enabled, boolean blocks, boolean mobs) {
 
-        public static final LootboundSettings DEFAULT = new LootboundSettings(true, true, true);
+        public static final LootboundSettings DEFAULT = new LootboundSettings(false, true, true);
 
         public static final Codec<LootboundSettings> CODEC = RecordCodecBuilder.create(builder -> builder.group(
-                Codec.BOOL.optionalFieldOf("enabled", true).forGetter(LootboundSettings::enabled),
+                Codec.BOOL.optionalFieldOf("enabled", false).forGetter(LootboundSettings::enabled),
                 Codec.BOOL.optionalFieldOf("blocks", true).forGetter(LootboundSettings::blocks),
                 Codec.BOOL.optionalFieldOf("mobs", true).forGetter(LootboundSettings::mobs)
         ).apply(builder, LootboundSettings::new));
@@ -287,10 +331,10 @@ public record BackpackAugmentsComponent(
 
     public record LightweaverSettings(boolean enabled, int minimumLight, boolean placeSound) {
 
-        public static final LightweaverSettings DEFAULT = new LightweaverSettings(true, 7, true);
+        public static final LightweaverSettings DEFAULT = new LightweaverSettings(false, 7, true);
 
         public static final Codec<LightweaverSettings> CODEC = RecordCodecBuilder.create(builder -> builder.group(
-                Codec.BOOL.optionalFieldOf("enabled", true).forGetter(LightweaverSettings::enabled),
+                Codec.BOOL.optionalFieldOf("enabled", false).forGetter(LightweaverSettings::enabled),
                 Codec.INT.optionalFieldOf("minimum_light", 7).forGetter(LightweaverSettings::minimumLight),
                 Codec.BOOL.optionalFieldOf("place_sound", true).forGetter(LightweaverSettings::placeSound)
         ).apply(builder, LightweaverSettings::new));
@@ -317,10 +361,10 @@ public record BackpackAugmentsComponent(
 
     public record SeedflowSettings(boolean enabled, boolean randomizeSeeds, boolean useFilters, List<ResourceLocation> filters) {
 
-        public static final SeedflowSettings DEFAULT = new SeedflowSettings(true, false, false, List.of());
+        public static final SeedflowSettings DEFAULT = new SeedflowSettings(false, false, false, List.of());
 
         public static final Codec<SeedflowSettings> CODEC = RecordCodecBuilder.create(builder -> builder.group(
-                Codec.BOOL.optionalFieldOf("enabled", true).forGetter(SeedflowSettings::enabled),
+                Codec.BOOL.optionalFieldOf("enabled", false).forGetter(SeedflowSettings::enabled),
                 Codec.BOOL.optionalFieldOf("randomize_seeds", false).forGetter(SeedflowSettings::randomizeSeeds),
                 Codec.BOOL.optionalFieldOf("use_filters", false).forGetter(SeedflowSettings::useFilters),
                 ResourceLocation.CODEC.sizeLimitedListOf(SEEDFLOW_MAX_FILTERS)
@@ -336,7 +380,7 @@ public record BackpackAugmentsComponent(
         );
 
         public SeedflowSettings {
-            filters = sanitizeFilters(filters, SEEDFLOW_MAX_FILTERS);
+            filters = sanitizeSeedflowFilters(filters);
         }
 
         public SeedflowSettings withEnabled(boolean enabled) {

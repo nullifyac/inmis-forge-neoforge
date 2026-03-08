@@ -52,6 +52,7 @@ public class Inmis {
     public static final Logger LOGGER = LogManager.getLogger();
 
     public static final boolean CURIOS_LOADED = ModList.get().isLoaded("curios");
+    public static final boolean ACCESSORIES_LOADED = ModList.get().isLoaded("accessories");
     public static InmisConfig CONFIG;
 
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM, MOD_ID);
@@ -149,6 +150,9 @@ public class Inmis {
         if (CURIOS_LOADED && CONFIG.enableTrinketCompatibility) {
             event.enqueueWork(draylar.inmis.compat.CuriosCompat::registerCurios);
         }
+        if (ACCESSORIES_LOADED && CONFIG.enableTrinketCompatibility) {
+            event.enqueueWork(draylar.inmis.compat.AccessoriesCompat::registerAccessories);
+        }
     }
 
     public static void buildCreativeTab(BuildCreativeModeTabContentsEvent event) {
@@ -173,6 +177,9 @@ public class Inmis {
             spillInventory(player, player.getInventory().armor, event);
             if (CURIOS_LOADED && CONFIG.enableTrinketCompatibility) {
                 draylar.inmis.compat.CuriosCompat.spillCurios(player, event);
+            }
+            if (ACCESSORIES_LOADED && CONFIG.enableTrinketCompatibility) {
+                draylar.inmis.compat.AccessoriesCompat.spillAccessories(player, event);
             }
         }
 

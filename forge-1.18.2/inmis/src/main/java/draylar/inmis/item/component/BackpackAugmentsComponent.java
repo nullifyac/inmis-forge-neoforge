@@ -7,6 +7,15 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BushBlock;
+import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.SaplingBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.ArrayList;
@@ -49,10 +58,10 @@ public record BackpackAugmentsComponent(
             LightweaverSettings.DEFAULT,
             SeedflowSettings.DEFAULT,
             HopperBridgeSettings.DEFAULT,
+            false,
             true,
             true,
-            true,
-            true
+            false
     );
 
     public BackpackAugmentsComponent {
@@ -103,7 +112,7 @@ public record BackpackAugmentsComponent(
                 : HopperBridgeSettings.DEFAULT;
         boolean farmhandEnabled = tag.contains(KEY_FARMHAND_ENABLED, Tag.TAG_BYTE)
                 ? tag.getBoolean(KEY_FARMHAND_ENABLED)
-                : true;
+                : false;
         boolean imbuedHideEnabled = tag.contains(KEY_IMBUED_HIDE_ENABLED, Tag.TAG_BYTE)
                 ? tag.getBoolean(KEY_IMBUED_HIDE_ENABLED)
                 : true;
@@ -112,7 +121,7 @@ public record BackpackAugmentsComponent(
                 : true;
         boolean reforgeEnabled = tag.contains(KEY_REFORGE_ENABLED, Tag.TAG_BYTE)
                 ? tag.getBoolean(KEY_REFORGE_ENABLED)
-                : true;
+                : false;
         return new BackpackAugmentsComponent(
                 funnelling,
                 quiverlink,
@@ -222,6 +231,41 @@ public record BackpackAugmentsComponent(
         return List.copyOf(unique);
     }
 
+    private static List<ResourceLocation> sanitizeSeedflowFilters(List<ResourceLocation> filters) {
+        List<ResourceLocation> ids = sanitizeFilters(filters, SEEDFLOW_MAX_FILTERS);
+        if (ids.isEmpty()) {
+            return ids;
+        }
+        List<ResourceLocation> valid = new ArrayList<>();
+        for (ResourceLocation id : ids) {
+            Item item = ForgeRegistries.ITEMS.getValue(id);
+            if (item != null && isSeedflowPlantableItem(item)) {
+                valid.add(id);
+            }
+        }
+        return List.copyOf(valid);
+    }
+
+    private static boolean isSeedflowPlantableItem(Item item) {
+        if (!(item instanceof BlockItem blockItem)) {
+            return false;
+        }
+        Block block = blockItem.getBlock();
+        if (!(block instanceof BushBlock) || block instanceof SaplingBlock) {
+            return false;
+        }
+        if (block instanceof CropBlock) {
+            return true;
+        }
+        BlockState cropState = block.defaultBlockState();
+        for (Property<?> property : cropState.getProperties()) {
+            if (property instanceof IntegerProperty integerProperty && integerProperty.getName().equals("age")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static List<ResourceLocation> readFilters(CompoundTag tag, String key, int max) {
         if (tag == null || !tag.contains(key, Tag.TAG_LIST)) {
             return List.of();
@@ -250,7 +294,7 @@ public record BackpackAugmentsComponent(
 
     public record FunnellingSettings(boolean enabled, Mode mode, List<ResourceLocation> filters) {
 
-        public static final FunnellingSettings DEFAULT = new FunnellingSettings(true, Mode.ALLOW, List.of());
+        public static final FunnellingSettings DEFAULT = new FunnellingSettings(false, Mode.ALLOW, List.of());
 
         public FunnellingSettings {
             mode = mode == null ? Mode.ALLOW : mode;
@@ -269,7 +313,7 @@ public record BackpackAugmentsComponent(
             if (tag == null || tag.isEmpty()) {
                 return DEFAULT;
             }
-            boolean enabled = tag.contains("enabled", Tag.TAG_BYTE) ? tag.getBoolean("enabled") : true;
+            boolean enabled = tag.contains("enabled", Tag.TAG_BYTE) ? tag.getBoolean("enabled") : false;
             Mode mode = Mode.fromTag(tag.getString("mode"));
             List<ResourceLocation> filters = readFilters(tag, "filters", FUNNELLING_MAX_FILTERS);
             return new FunnellingSettings(enabled, mode, filters);
@@ -394,7 +438,7 @@ public record BackpackAugmentsComponent(
 
     public record LootboundSettings(boolean enabled, boolean blocks, boolean mobs) {
 
-        public static final LootboundSettings DEFAULT = new LootboundSettings(true, true, true);
+        public static final LootboundSettings DEFAULT = new LootboundSettings(false, true, true);
 
         public CompoundTag toTag() {
             CompoundTag tag = new CompoundTag();
@@ -408,7 +452,7 @@ public record BackpackAugmentsComponent(
             if (tag == null || tag.isEmpty()) {
                 return DEFAULT;
             }
-            boolean enabled = tag.contains("enabled", Tag.TAG_BYTE) ? tag.getBoolean("enabled") : true;
+            boolean enabled = tag.contains("enabled", Tag.TAG_BYTE) ? tag.getBoolean("enabled") : false;
             boolean blocks = tag.contains("blocks", Tag.TAG_BYTE) ? tag.getBoolean("blocks") : true;
             boolean mobs = tag.contains("mobs", Tag.TAG_BYTE) ? tag.getBoolean("mobs") : true;
             return new LootboundSettings(enabled, blocks, mobs);
@@ -439,7 +483,7 @@ public record BackpackAugmentsComponent(
 
     public record LightweaverSettings(boolean enabled, int minimumLight, boolean placeSound) {
 
-        public static final LightweaverSettings DEFAULT = new LightweaverSettings(true, 7, true);
+        public static final LightweaverSettings DEFAULT = new LightweaverSettings(false, 7, true);
 
         public CompoundTag toTag() {
             CompoundTag tag = new CompoundTag();
@@ -453,7 +497,7 @@ public record BackpackAugmentsComponent(
             if (tag == null || tag.isEmpty()) {
                 return DEFAULT;
             }
-            boolean enabled = tag.contains("enabled", Tag.TAG_BYTE) ? tag.getBoolean("enabled") : true;
+            boolean enabled = tag.contains("enabled", Tag.TAG_BYTE) ? tag.getBoolean("enabled") : false;
             int minimumLight = tag.contains("minimum_light", Tag.TAG_INT) ? tag.getInt("minimum_light") : 7;
             boolean placeSound = tag.contains("place_sound", Tag.TAG_BYTE) ? tag.getBoolean("place_sound") : true;
             return new LightweaverSettings(enabled, minimumLight, placeSound);
@@ -484,10 +528,10 @@ public record BackpackAugmentsComponent(
 
     public record SeedflowSettings(boolean enabled, boolean randomizeSeeds, boolean useFilters, List<ResourceLocation> filters) {
 
-        public static final SeedflowSettings DEFAULT = new SeedflowSettings(true, false, false, List.of());
+        public static final SeedflowSettings DEFAULT = new SeedflowSettings(false, false, false, List.of());
 
         public SeedflowSettings {
-            filters = sanitizeFilters(filters, SEEDFLOW_MAX_FILTERS);
+            filters = sanitizeSeedflowFilters(filters);
         }
 
         public CompoundTag toTag() {
@@ -503,7 +547,7 @@ public record BackpackAugmentsComponent(
             if (tag == null || tag.isEmpty()) {
                 return DEFAULT;
             }
-            boolean enabled = tag.contains("enabled", Tag.TAG_BYTE) ? tag.getBoolean("enabled") : true;
+            boolean enabled = tag.contains("enabled", Tag.TAG_BYTE) ? tag.getBoolean("enabled") : false;
             boolean randomizeSeeds = tag.contains("randomize_seeds", Tag.TAG_BYTE) ? tag.getBoolean("randomize_seeds") : false;
             boolean useFilters = tag.contains("use_filters", Tag.TAG_BYTE) ? tag.getBoolean("use_filters") : false;
             List<ResourceLocation> filters = readFilters(tag, "filters", SEEDFLOW_MAX_FILTERS);

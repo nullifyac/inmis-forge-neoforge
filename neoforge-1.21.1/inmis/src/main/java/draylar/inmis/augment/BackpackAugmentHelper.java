@@ -1,6 +1,7 @@
 package draylar.inmis.augment;
 
 import draylar.inmis.Inmis;
+import draylar.inmis.compat.AccessoriesCompat;
 import draylar.inmis.compat.CuriosCompat;
 import draylar.inmis.item.BackpackItem;
 import net.minecraft.world.entity.player.Inventory;
@@ -21,6 +22,10 @@ public final class BackpackAugmentHelper {
         collectBackpacks(inventory.items, stacks);
         collectBackpacks(inventory.armor, stacks);
         collectBackpacks(inventory.offhand, stacks);
+
+        if (Inmis.ACCESSORIES_LOADED && Inmis.CONFIG.enableTrinketCompatibility) {
+            stacks.addAll(AccessoriesCompat.getEquippedBackpacks(player));
+        }
 
         if (Inmis.CURIOS_LOADED && Inmis.CONFIG.enableTrinketCompatibility) {
             stacks.addAll(CuriosCompat.getEquippedBackpacks(player));

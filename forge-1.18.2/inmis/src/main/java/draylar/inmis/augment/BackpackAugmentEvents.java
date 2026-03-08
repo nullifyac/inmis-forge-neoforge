@@ -6,6 +6,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerXpEvent;
+import net.minecraftforge.event.world.BlockEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -29,6 +30,16 @@ public final class BackpackAugmentEvents {
     public static void onEntityDropLoot(LivingDropsEvent event) {
         if (event.getSource().getEntity() instanceof Player player) {
             BackpackAugmentHandler.onLootDroppedByEntity(event.getDrops(), player);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onBlockBreak(BlockEvent.BreakEvent event) {
+        if (event.isCanceled()) {
+            return;
+        }
+        if (event.getPlayer() instanceof net.minecraft.server.level.ServerPlayer player) {
+            BackpackAugmentHandler.onBlockBroken(player, event.getState(), event.getPos());
         }
     }
 

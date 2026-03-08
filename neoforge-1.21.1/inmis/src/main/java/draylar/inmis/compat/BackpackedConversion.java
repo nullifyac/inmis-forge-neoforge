@@ -61,6 +61,10 @@ public final class BackpackedConversion {
             converted += CuriosCompat.replaceMatchingStacks(player, BackpackedConversion::isBackpackedStack,
                     stack -> copyStackAsInmis(stack, replacement));
         }
+        if (Inmis.ACCESSORIES_LOADED && Inmis.CONFIG.enableTrinketCompatibility) {
+            converted += AccessoriesCompat.replaceMatchingStacks(player, BackpackedConversion::isBackpackedStack,
+                    stack -> copyStackAsInmis(stack, replacement));
+        }
 
         return converted;
     }
