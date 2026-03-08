@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "id": "accessories",
+  "version": "${version}",
+  "name": "Accessories",
+  "description": "A extendable and data-driven Accessory Mod for Minecraft",
+  "authors": [
+    {
+      "name": "Blodhgarm",
+      "contact": {
+        "homepage": "https://github.com/Dragon-Seeker"
+      }
+    },
+    {
+      "name": "chyzman",
+      "contact": {
+        "homepage": "https://chyz.xyz/"
+      }
+    },
+    {
+      "name": "Dr.Zeal",
+      "contact": {
+        "homepage": "https://linktr.ee/miscellaneouszeal"
+      }
+    }
+  ],
+  "contributors": [
+    "glisco",
+    "BasiqueEvangelist",
+    "mpustovoi",
+    "EvanHsieh0415",
+    "notlin4",
+    "RuyaSavascisi",
+    "TheLegendofSaram",
+    "Zailer43",
+    {
+      "name": "Emi",
+      "contact": { "github": "https://github.com/emilyploszaj" }
+    },
+    {
+      "name": "C4",
+      "contact": { "github": "https://github.com/TheIllusiveC4" }
+    }
+  ],
+  "contact": {
+    "homepage": "https://wispforest.io/",
+    "sources": "https://github.com/wisp-forest/accessories"
+  },
+  "license": "MIT",
+  "icon": "assets/accessories/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "io.wispforest.accessories.fabric.AccessoriesFabric"
+    ],
+    "client":[
+      "io.wispforest.accessories.fabric.client.AccessoriesClientFabric"
+    ],
+    "rei_client": [
+      "io.wispforest.accessories.compat.rei.AccessoriesClientREIPlugin"
+    ],
+    "emi": [
+      "io.wispforest.accessories.compat.emi.AccessoriesClientEMIPlugin"
+    ],
+    "jei": [
+      "io.wispforest.accessories.compat.jei.AccessoriesClientJEIPlugin"
+    ]
+  },
+  "mixins": [
+    "accessories-fabric.mixins.json",
+    "accessories-common.mixins.json"
+  ],
+  "accessWidener": "accessories-fabric.accesswidener",
+  "depends": {
+    "fabric-api": ">=0.116.0",
+    "minecraft": ">=1.21",
+    "owo": ">=0.12.15.1+1.21"
+  },
+  "breaks": {
+    "accessories_compat_layer": "<=0.1.9"
+  },
+  "custom": {
+    "loom:injected_interfaces": {
+      "net/minecraft/class_1309": [
+        "io/wispforest/accessories/pond/AccessoriesAPIAccess"
+      ],
+      "net/minecraft/class_4264": [
+        "io/wispforest/accessories/client/gui/AbstractButtonExtension"
+      ]
+    }
+  }
+}

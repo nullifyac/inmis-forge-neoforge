@@ -1,0 +1,31 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+#issueTrackerURL = ""
+license = "MIT"
+
+[[mods]]
+modId = "testccessories"
+version = "1.0.0"
+displayName = "Testccessories"
+authors = "chyzman"
+description = '''
+Testmod for accessories
+'''
+#logoFile = ""
+
+[[mixins]]
+config = 'testccessories-neoforge.mixins.json'
+
+[[dependencies.testccessories]]
+modId = "neoforge"
+required = true
+versionRange = "[20,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.testccessories]]
+modId = "minecraft"
+required = true
+versionRange = "[1.20.4,)"
+ordering = "NONE"
+side = "BOTH"

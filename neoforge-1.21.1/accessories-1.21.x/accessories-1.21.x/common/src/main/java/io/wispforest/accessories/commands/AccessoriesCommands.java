@@ -1,0 +1,488 @@
+package io.wispforest.accessories.commands;
+
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.LiteralMessage;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.Dynamic3CommandExceptionType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.logging.LogUtils;
+import io.wispforest.accessories.Accessories;
+import io.wispforest.accessories.AccessoriesInternals;
+import io.wispforest.accessories.api.client.rendering.CustomDataRenderer;
+import io.wispforest.accessories.api.components.*;
+import io.wispforest.accessories.data.CustomRendererLoader;
+import io.wispforest.accessories.data.EntitySlotLoader;
+import io.wispforest.accessories.data.SlotGroupLoader;
+import io.wispforest.accessories.data.SlotTypeLoader;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.ComponentArgument;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
+import net.minecraft.commands.arguments.item.ItemArgument;
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.slf4j.Logger;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public class AccessoriesCommands {
+
+    public static final SimpleCommandExceptionType NON_LIVING_ENTITY_TARGET = new SimpleCommandExceptionType(Component.translatable("argument.livingEntities.nonLiving"));
+
+    public static final SimpleCommandExceptionType INVALID_SLOT_TYPE = new SimpleCommandExceptionType(new LiteralMessage("Invalid Slot Type"));
+
+    public static final Logger LOGGER = LogUtils.getLogger();
+
+    public static void registerCommandArgTypes() {
+        AccessoriesInternals.registerCommandArgumentType(Accessories.of("slot_type"), SlotArgumentType.class, RecordArgumentTypeInfo.of(ctx -> SlotArgumentType.INSTANCE));
+        AccessoriesInternals.registerCommandArgumentType(Accessories.of("resource"), ResourceExtendedArgument.class, RecordArgumentTypeInfo.of(ResourceExtendedArgument::attributes));
+    }
+
+    public static LivingEntity getOrThrowLivingEntity(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        var entity = EntityArgument.getEntity(ctx, "entity");
+
+        if(!(entity instanceof LivingEntity livingEntity)) {
+            throw NON_LIVING_ENTITY_TARGET.create();
+        }
+
+        return livingEntity;
+    }
+
+    //accessories edit {}
+    public static void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext context) {
+        var base = Commands.literal("accessories")
+                .requires(commandSourceStack -> commandSourceStack.hasPermission(Commands.LEVEL_GAMEMASTERS));
+
+        if (Accessories.DEBUG) {
+            base.then(
+                    Commands.literal("create-renderer-stack")
+                            .then(
+                                    Commands.argument("custom_name", ComponentArgument.textComponent(context))
+                                            .then(
+                                                    Commands.argument("renderer_id", ResourceLocationArgument.id())
+                                                            .then(
+                                                                    Commands.argument("item_model_id", ResourceLocationArgument.id())
+                                                                            .then(
+                                                                                    Commands.argument("is_bundle", BoolArgumentType.bool())
+                                                                                            .executes(AccessoriesCommands::createRenderStack)
+                                                                            )
+                                                                            .executes(AccessoriesCommands::createRenderStack)
+                                                            )
+                                            )
+                            )
+            ).then(
+                    Commands.literal("listen-to-renderer")
+                            .then(
+                                    Commands.argument("id", ResourceLocationArgument.id())
+                                            .executes(ctx -> {
+                                                var id = ctx.getArgument("id", ResourceLocation.class);
+
+                                                CustomRendererLoader.constantFileResolving(ctx.getSource().getServer(), id);
+
+                                                return 1;
+                                            })
+                            )
+                            .executes(ctx -> {
+                                CustomRendererLoader.constantFileResolving(ctx.getSource().getServer(), null);
+
+                                return 1;
+                            })
+
+            );
+        }
+
+        dispatcher.register(
+                base
+                        .then(
+                                Commands.literal("edit")
+                                        .then(
+                                                Commands.argument("entity", EntityArgument.entity())
+                                                        .executes((ctx) -> {
+                                                            Accessories.askPlayerForVariant(ctx.getSource().getPlayerOrException(), getOrThrowLivingEntity(ctx));
+
+                                                            return 1;
+                                                        })
+                                        )
+                                        .executes(ctx -> {
+                                            Accessories.askPlayerForVariant(ctx.getSource().getPlayerOrException());
+
+
+                                            return 1;
+                                        })
+                        )
+                        .then(
+                                Commands.literal("nest")
+                                        .then(
+                                                Commands.argument("item", ItemArgument.item(context))
+                                                        .executes((ctx) -> {
+                                                            var player = ctx.getSource().getPlayerOrException();
+
+                                                            var stack = player.getMainHandItem();
+
+                                                            var innerStack = ItemArgument.getItem(ctx, "item").createItemStack(1, false);
+
+                                                            stack.update(
+                                                                    AccessoriesDataComponents.NESTED_ACCESSORIES,
+                                                                    AccessoryNestContainerContents.EMPTY,
+                                                                    data -> data.addStack(innerStack));
+
+                                                            return 1;
+                                                        })
+                                        )
+                        )
+                        .then(
+                                Commands.literal("slot")
+                                        .then(
+                                                Commands.literal("add")
+                                                        .then(
+                                                                Commands.literal("valid")
+                                                                        .then(Commands.argument("slot", SlotArgumentType.INSTANCE)
+                                                                                .executes(ctx -> adjustSlotValidationOnStack(0, ctx.getSource().getPlayerOrException(), ctx))
+                                                                        ))
+                                                        .then(
+                                                                Commands.literal("invalid")
+                                                                        .then(Commands.argument("slot", SlotArgumentType.INSTANCE)
+                                                                                .executes(ctx -> adjustSlotValidationOnStack(1, ctx.getSource().getPlayerOrException(), ctx))
+                                                                        ))
+
+                                        ).then(
+                                                Commands.literal("remove")
+                                                        .then(
+                                                                Commands.literal("valid")
+                                                                        .then(Commands.argument("slot", SlotArgumentType.INSTANCE)
+                                                                                .executes(ctx -> adjustSlotValidationOnStack(2, ctx.getSource().getPlayerOrException(), ctx))
+                                                                        ))
+                                                        .then(
+                                                                Commands.literal("invalid")
+                                                                        .then(Commands.argument("slot", SlotArgumentType.INSTANCE)
+                                                                                .executes(ctx -> adjustSlotValidationOnStack(3, ctx.getSource().getPlayerOrException(), ctx))
+                                                                        ))
+                                        )
+                        )
+                        .then(
+                                Commands.literal("stack-sizing")
+                                        .then(
+                                                Commands.literal("useStackSize")
+                                                        .then(
+                                                                Commands.argument("value", BoolArgumentType.bool())
+                                                                        .executes(ctx -> {
+                                                                            var player = ctx.getSource().getPlayerOrException();
+
+                                                                            var bl = ctx.getArgument("value", Boolean.class);
+
+                                                                            player.getMainHandItem().update(AccessoriesDataComponents.STACK_SIZE,
+                                                                                    AccessoryStackSizeComponent.DEFAULT,
+                                                                                    component -> component.useStackSize(bl));
+
+                                                                            return 1;
+                                                                        })
+                                                        )
+                                        ).then(
+                                                Commands.argument("value", IntegerArgumentType.integer())
+                                                        .executes(ctx -> {
+                                                            var player = ctx.getSource().getPlayerOrException();
+
+                                                            var size = ctx.getArgument("value", Integer.class);
+
+                                                            player.getMainHandItem().update(AccessoriesDataComponents.STACK_SIZE,
+                                                                    AccessoryStackSizeComponent.DEFAULT,
+                                                                    component -> component.sizeOverride(size));
+
+                                                            return 1;
+                                                        })
+                                        )
+                        )
+                        .then(
+                                Commands.literal("attribute")
+                                        .then(
+                                                Commands.literal("modifier")
+                                                        .then(
+                                                                Commands.literal("add")
+                                                                        .then(
+                                                                                Commands.argument("attribute", ResourceExtendedArgument.attributes(context))
+                                                                                        .then(
+                                                                                                Commands.argument("id", ResourceLocationArgument.id())
+                                                                                                        .then(Commands.argument("value", DoubleArgumentType.doubleArg())
+                                                                                                                        .then(createAddLiteral("add_value"))
+                                                                                                                        .then(createAddLiteral("add_multiplied_base"))
+                                                                                                                        .then(createAddLiteral("add_multiplied_total"))
+                                                                                                        )
+                                                                                        )
+                                                                        )
+                                                        )
+                                                        .then(
+                                                                Commands.literal("remove")
+                                                                        .then(
+                                                                                Commands.argument("attribute", ResourceExtendedArgument.attributes(context))
+                                                                                        .then(
+                                                                                                Commands.argument("id", ResourceLocationArgument.id())
+                                                                                                        .executes(
+                                                                                                                ctx -> removeModifier(
+                                                                                                                        ctx.getSource(),
+                                                                                                                        ctx.getSource().getPlayerOrException(),
+                                                                                                                        ResourceExtendedArgument.getAttribute(ctx, "attribute"),
+                                                                                                                        ResourceLocationArgument.getId(ctx, "id")
+                                                                                                                )
+                                                                                                        )
+                                                                                        )
+                                                                        )
+                                                        )
+                                                        .then(
+                                                                Commands.literal("get")
+                                                                        .then(
+                                                                                Commands.argument("attribute", ResourceExtendedArgument.attributes(context))
+                                                                                        .then(
+                                                                                                Commands.argument("id", ResourceLocationArgument.id())
+                                                                                                        .executes(
+                                                                                                                ctx -> getAttributeModifier(
+                                                                                                                        ctx.getSource(),
+                                                                                                                        ctx.getSource().getPlayerOrException(),
+                                                                                                                        ResourceExtendedArgument.getAttribute(ctx, "attribute"),
+                                                                                                                        ResourceLocationArgument.getId(ctx, "id"),
+                                                                                                                        1.0
+                                                                                                                )
+                                                                                                        )
+                                                                                                        .then(
+                                                                                                                Commands.argument("scale", DoubleArgumentType.doubleArg())
+                                                                                                                        .executes(
+                                                                                                                                ctx -> getAttributeModifier(
+                                                                                                                                        ctx.getSource(),
+                                                                                                                                        ctx.getSource().getPlayerOrException(),
+                                                                                                                                        ResourceExtendedArgument.getAttribute(ctx, "attribute"),
+                                                                                                                                        ResourceLocationArgument.getId(ctx, "id"),
+                                                                                                                                        DoubleArgumentType.getDouble(ctx, "scale")
+                                                                                                                                )
+                                                                                                                        )
+                                                                                                        )
+                                                                                        )
+                                                                        )
+                                                        )
+                                        )
+                        ).then(
+                                Commands.literal("log")
+                                        .then(
+                                                Commands.literal("slots")
+                                                        .executes(ctx -> {
+                                                            LOGGER.info("All given Slots registered:");
+
+                                                            for (var slotType : SlotTypeLoader.getSlotTypes(ctx.getSource().getLevel()).values()) {
+                                                                LOGGER.info(slotType.toString());
+                                                            }
+
+                                                            return 1;
+                                                        })
+                                        )
+                                        .then(
+                                                Commands.literal("groups")
+                                                        .executes(ctx -> {
+                                                            LOGGER.info("All given Slot Groups registered:");
+
+                                                            for (var group : SlotGroupLoader.getGroups(ctx.getSource().getLevel())) {
+                                                                LOGGER.info(group.toString());
+                                                            }
+
+                                                            return 1;
+                                                        })
+                                        )
+                                        .then(
+                                                Commands.literal("entity_bindings")
+                                                        .executes(ctx -> {
+                                                            LOGGER.info("All given Entity Bindings registered:");
+
+                                                            EntitySlotLoader.INSTANCE.getEntitySlotData(false).forEach((type, slots) -> {
+                                                                LOGGER.info("[{}]: {}", type, slots.keySet());
+                                                            });
+
+                                                            return 1;
+                                                        })
+                                        )
+                        )
+        );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> createAddLiteral(String literal) {
+        var selectedValue = Arrays.stream(AttributeModifier.Operation.values())
+                .filter(value -> value.getSerializedName().equals(literal))
+                .findFirst()
+                .orElse(null);
+
+        if(selectedValue == null) throw new IllegalStateException("Unable to handle the given literal as its not a valid AttributeModifier Operation! [Literal: " + literal + "]");
+
+        return Commands.literal(literal)
+                .then(
+                        Commands.argument("slot", SlotArgumentType.INSTANCE)
+                                .then(
+                                        Commands.argument("isStackable", BoolArgumentType.bool())
+                                                .executes(
+                                                        ctx -> addModifier(
+                                                                ctx.getSource(),
+                                                                ctx.getSource().getPlayerOrException(),
+                                                                ResourceExtendedArgument.getAttribute(ctx, "attribute"),
+                                                                ResourceLocationArgument.getId(ctx, "id"),
+                                                                DoubleArgumentType.getDouble(ctx, "value"),
+                                                                selectedValue,
+                                                                SlotArgumentType.getSlot(ctx, "slot"),
+                                                                BoolArgumentType.getBool(ctx, "isStackable")
+                                                        )
+                                                )
+                                )
+                );
+    }
+
+    private static int getAttributeModifier(CommandSourceStack commandSourceStack, LivingEntity livingEntity, Holder<Attribute> holder, ResourceLocation resourceLocation, double d) throws CommandSyntaxException {
+        var stack = livingEntity.getMainHandItem();
+
+        var component = stack.getOrDefault(AccessoriesDataComponents.ATTRIBUTES, AccessoryItemAttributeModifiers.EMPTY);
+
+        var modifier = component.getModifier(holder, resourceLocation);
+
+        if (modifier == null) {
+            throw ERROR_NO_SUCH_MODIFIER.create(stack.getDisplayName(), getAttributeDescription(holder), resourceLocation);
+        }
+
+        double e = modifier.amount();
+
+        commandSourceStack.sendSuccess(
+                () -> Component.translatable(
+                        "commands.attribute.modifier.value.get.success_itemstack", Component.translationArg(resourceLocation), getAttributeDescription(holder), stack.getDisplayName(), e
+                ),
+                false
+        );
+
+        return (int)(e * d);
+    }
+
+    private static final Dynamic3CommandExceptionType ERROR_MODIFIER_ALREADY_PRESENT = new Dynamic3CommandExceptionType(
+            (var1, var2, var3) -> Component.translatableEscape("commands.attribute.failed.modifier_already_present_itemstack", var1, var2, var3)
+    );
+
+    private static int addModifier(CommandSourceStack commandSourceStack, LivingEntity livingEntity, Holder<Attribute> holder, ResourceLocation resourceLocation, double d, AttributeModifier.Operation operation, String slotName, boolean isStackable) throws CommandSyntaxException {
+        var stack = livingEntity.getMainHandItem();
+
+        var component = stack.getOrDefault(AccessoriesDataComponents.ATTRIBUTES, AccessoryItemAttributeModifiers.EMPTY);
+
+        if (component.hasModifier(holder, resourceLocation)) {
+            throw ERROR_MODIFIER_ALREADY_PRESENT.create(resourceLocation, getAttributeDescription(holder), stack.getDisplayName());
+        }
+
+        stack.set(AccessoriesDataComponents.ATTRIBUTES, component.withModifierAdded(holder, new AttributeModifier(resourceLocation, d, operation), slotName, isStackable));
+
+        commandSourceStack.sendSuccess(
+                () -> Component.translatable(
+                        "commands.attribute.modifier.add.success_itemstack", Component.translationArg(resourceLocation), getAttributeDescription(holder), stack.getDisplayName()
+                ),
+                false
+        );
+
+        return 1;
+    }
+
+    private static final Dynamic3CommandExceptionType ERROR_NO_SUCH_MODIFIER = new Dynamic3CommandExceptionType(
+            (var1, var2, var3) -> Component.translatableEscape("commands.attribute.failed.no_modifier_itemstack", var1, var2, var3)
+    );
+
+    private static int removeModifier(CommandSourceStack commandSourceStack, LivingEntity livingEntity, Holder<Attribute> holder, ResourceLocation location) throws CommandSyntaxException {
+        MutableBoolean removedModifier = new MutableBoolean(false);
+
+        var stack = livingEntity.getMainHandItem();
+
+        stack.update(AccessoriesDataComponents.ATTRIBUTES, AccessoryItemAttributeModifiers.EMPTY, component -> {
+            var size = component.modifiers().size();
+
+            component = component.withoutModifier(holder, location);
+
+            if(size != component.modifiers().size()) removedModifier.setTrue();
+
+            return component;
+        });
+
+        if(!removedModifier.getValue()) {
+            throw ERROR_NO_SUCH_MODIFIER.create(location, getAttributeDescription(holder), stack.getDisplayName());
+        }
+
+        commandSourceStack.sendSuccess(
+                () -> Component.translatable(
+                        "commands.attribute.modifier.remove.success_itemstack", Component.translationArg(location), getAttributeDescription(holder), stack.getDisplayName()
+                ),
+                false
+        );
+
+        return 1;
+    }
+
+    private static Component getAttributeDescription(Holder<Attribute> attribute) {
+        return Component.translatable(attribute.value().getDescriptionId());
+    }
+
+    private static int adjustSlotValidationOnStack(int operation, LivingEntity player, CommandContext<CommandSourceStack> ctx) {
+        var slotName = SlotArgumentType.getSlot(ctx, "slot");
+
+        player.getMainHandItem().update(AccessoriesDataComponents.SLOT_VALIDATION, AccessorySlotValidationComponent.EMPTY, component -> {
+            return switch (operation) {
+                case 0 -> component.addValidSlot(slotName);
+                case 1 -> component.addInvalidSlot(slotName);
+                case 2 -> component.removeValidSlot(slotName);
+                case 3 -> component.removeInvalidSlot(slotName);
+                default -> throw new IllegalStateException("Unexpected value: " + operation);
+            };
+        });
+
+        return 1;
+    }
+
+    private static int createRenderStack(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        var rendererId = ctx.getArgument("renderer_id", ResourceLocation.class);
+        var modelId = ctx.getArgument("item_model_id", ResourceLocation.class);
+        var component = ComponentArgument.getComponent(ctx, "custom_name");
+
+        Item item = Items.STICK;
+
+        try {
+            if (ctx.getArgument("is_bundle", Boolean.class)) item = Items.BUNDLE;
+        } catch (Throwable ignored) {}
+
+        var itemStack = item.getDefaultInstance();
+
+        itemStack.set(DataComponents.ITEM_NAME, component);
+
+        itemStack.set(
+                AccessoriesDataComponents.CUSTOM_RENDERER,
+                new AccessoryCustomRendererComponent(List.of(
+                        new CustomDataRenderer(rendererId, Map.of(), List.of(), null)))
+        );
+
+        itemStack.set(
+                AccessoriesDataComponents.ITEM_MODEL_OVERRIDE,
+                new AccessoryItemCosmeticOverride(modelId)
+        );
+
+        itemStack.set(
+                AccessoriesDataComponents.SLOT_VALIDATION,
+                new AccessorySlotValidationComponent(Set.of("any"), Set.of())
+        );
+
+        ctx.getSource().getPlayerOrException()
+                .addItem(itemStack);
+
+        return 1;
+    }
+
+}
