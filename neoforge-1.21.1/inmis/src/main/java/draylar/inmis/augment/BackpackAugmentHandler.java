@@ -16,6 +16,7 @@ import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.entity.projectile.ThrownTrident;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -74,6 +75,9 @@ public final class BackpackAugmentHandler {
     }
 
     public static boolean beforeArrowPickup(Player player, AbstractArrow arrow) {
+        if (arrow instanceof ThrownTrident) {
+            return false;
+        }
         ItemStack stack = arrow.getPickupItemStackOrigin().copy();
         FunnelResult result = funnelItemStackIntoBackpacks(player, stack);
         if (!result.hasRemaining()) {
@@ -577,7 +581,8 @@ public final class BackpackAugmentHandler {
     }
 
     private record FunnelResult(boolean hasRemaining, int funnelCount) {
-        private static final FunnelResult IGNORE = new FunnelResult(false, 0);
+        // No backpacks or no applicable funneling means the whole stack is still pending normal pickup.
+        private static final FunnelResult IGNORE = new FunnelResult(true, 0);
     }
 
     private record BackpackSnapshot(ItemStack stack, BackpackInfo tier, BackpackAugmentsComponent augments, BackpackInventory inventory) {

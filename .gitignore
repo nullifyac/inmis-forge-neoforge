@@ -4,6 +4,7 @@ out/
 *.class
 *.jar
 *.war
+**/release/
 
 # IDE
 .idea/
@@ -41,6 +42,7 @@ bin/
 
 # Project-specific
 /images/
+/temp/
 
 # Ignore generated debug folders
 **/debug/

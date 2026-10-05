@@ -151,36 +151,38 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
 
         @Override
         public boolean mayPickup(Player player) {
-            return stackMovementIsAllowed(getItem());
+            return getItem() != backpackStack;
         }
 
         @Override
         public boolean mayPlace(ItemStack stack) {
-            if (Inmis.CONFIG.unstackablesOnly) {
-                if (stack.getMaxStackSize() > 1) {
-                    return false;
-                }
-            }
-
-            if (Inmis.CONFIG.disableShulkers && container instanceof BackpackInventory) {
-                Item item = stack.getItem();
-                if (item instanceof BlockItem blockItem) {
-                    return !(blockItem.getBlock() instanceof ShulkerBoxBlock);
-                }
+            if (stack == backpackStack) {
+                return false;
             }
 
             if (container instanceof BackpackInventory) {
+                if (stack.getItem() instanceof BackpackItem) {
+                    return false;
+                }
+
+                if (Inmis.CONFIG.unstackablesOnly && stack.getMaxStackSize() > 1) {
+                    return false;
+                }
+
+                if (Inmis.CONFIG.disableShulkers) {
+                    Item item = stack.getItem();
+                    if (item instanceof BlockItem blockItem && blockItem.getBlock() instanceof ShulkerBoxBlock) {
+                        return false;
+                    }
+                }
+
                 ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
                 if (id != null && Inmis.CONFIG.blacklist != null && Inmis.CONFIG.blacklist.contains(id.toString())) {
                     return false;
                 }
             }
 
-            return stackMovementIsAllowed(stack);
-        }
-
-        private boolean stackMovementIsAllowed(ItemStack stack) {
-            return !(stack.getItem() instanceof BackpackItem) && stack != backpackStack;
+            return true;
         }
     }
 

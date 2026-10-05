@@ -21,25 +21,28 @@ Inmis provides players with customizable backpacks that can be:
 inmis-forge-neoforge/
 |-- forge-1.18.2/                   # Minecraft 1.18.2 (Forge)
 |   |-- inmis/                      # Main mod source
-|   |-- Backpacked-1.18.X/          # Backpacked dependency
-|   |-- Curios-1.18.x/              # Curios mod (dependency)
+|   |-- Backpacked-1.18.X/          # Backpacked reference source
+|   |-- Curios-1.18.x/              # Curios reference source
 |   `-- release/                    # Built artifacts
 |-- forge-1.19.2/                   # Minecraft 1.19.2 (Forge)
 |   |-- inmis/                      # Main mod source
-|   |-- Backpacked-1.19.2/          # Backpacked dependency
-|   |-- Curios-1.19.x/              # Curios mod (dependency)
+|   |-- Backpacked-1.19.2/          # Backpacked reference source
+|   |-- Curios-1.19.x/              # Curios reference source
 |   `-- release/                    # Built artifacts
 |-- forge-1.20.1/                   # Minecraft 1.20.1 (Forge)
 |   |-- inmis/                      # Main mod source
-|   |-- Backpacked-multiloader-1.20.X/  # Backpacked dependency (multiloader)
-|   |-- Curios-1.20.x/              # Curios mod (dependency)
+|   |-- Backpacked-multiloader-1.20.X/  # Backpacked reference source (multiloader)
+|   |-- Curios-1.20.x/              # Curios reference source
 |   `-- release/                    # Built artifacts
 `-- neoforge-1.21.1/                # Minecraft 1.21.1 (NeoForge)
     |-- inmis/                      # Main mod source
-    |-- Backpacked-multiloader-1.21.1/  # Backpacked dependency (multiloader)
-    |-- Curios-1.21.x/              # Curios mod (dependency)
+    |-- Backpacked-multiloader-1.21.1/  # Backpacked reference source (multiloader)
+    |-- Curios-1.21.x/              # Curios reference source
+    |-- accessories-1.21.x/        # Accessories reference source
     `-- release/                    # Built artifacts
 ```
+
+Each `inmis/` directory is an independent Gradle project. Its build resolves dependencies from Maven repositories; the sibling reference sources are not included in that build. Local `release/`, build, runtime, and temporary files are excluded from Git.
 
 ## Quick Start
 
@@ -59,11 +62,13 @@ cd forge-1.20.1/inmis
 
 The compiled mod will be available in `build/libs/`.
 
+On Windows PowerShell, use `.\gradlew.bat build` from the same directory. The Forge builds reobfuscate the mod JAR through `reobfJar`.
+
 ## Features
 
 ### Core Functionality
-- **Multiple Backpack Types**: Frayed, Baby, Plated, Gilded, Bejeweled, Withered, and Endless Backpacks
-- **Inventory Management**: 27-slot storage in most backpacks
+- **Multiple Backpack Types**: Frayed, Baby, Plated, Gilded, Bejeweled, Blazing, Withered, and Endless Backpacks
+- **Inventory Management**: Configurable storage, with default backpack sizes from 3 to 90 slots
 - **Quick Access**: Default keybind **B** to open the first backpack in inventory
 - **Armor Integration**: Equip backpacks in the chestplate slot
 
@@ -74,7 +79,7 @@ The compiled mod will be available in `build/libs/`.
 
 ### Compatibility
 - **Curios Mod**: Equip backpacks in dedicated Curio slots for enhanced gameplay
-- **ShulkerBoxTooltip**: Preview backpack contents via tooltip
+- **Accessories Mod (NeoForge 1.21.1)**: Equip backpacks in Accessories slots
 
 ### Configuration
 Customize gameplay through `config/inmis.json`:
@@ -87,15 +92,14 @@ Customize gameplay through `config/inmis.json`:
 
 ### Forge Versions (1.18.2, 1.19.2, 1.20.1)
 Each Forge version includes:
-- Optimized Forge API integration
-- Tested compatibility with popular Forge mods
+- Forge event and mixin integration
 - Curios mod support for enhanced trinket slots
 
 ### NeoForge (1.21.1)
-Latest version with:
-- Modern NeoForge API
-- Updated to Minecraft 1.21.1 features
-- Enhanced performance optimizations
+The NeoForge version uses:
+- NeoForge events and mixins for Minecraft 1.21.1
+- Item data components for backpack contents and augments
+- Optional Curios and Accessories integration
 
 ## Development
 
@@ -104,10 +108,9 @@ Each version follows the standard Minecraft mod development structure:
 ```
 inmis/
 |-- src/
-|   |-- main/
-|   |   |-- java/          # Source code
-|   |   `-- resources/     # Assets and configs
-|   `-- test/              # Unit tests
+|   `-- main/
+|       |-- java/          # Source code
+|       `-- resources/     # Assets and configs
 |-- assets/                # Textures and UI assets
 |-- build.gradle           # Build configuration
 |-- gradle.properties      # Gradle properties
@@ -122,7 +125,10 @@ inmis/
 
 ### Dependencies
 - **Forge/NeoForge**: Modding framework
-- **Curios**: Trinket/accessory system
+- **Curios**: Optional trinket/accessory integration
+- **Accessories (NeoForge 1.21.1)**: Optional accessory integration
+
+The Inmis projects currently have no automated test sources. `gradlew build` checks compilation, resource processing, and JAR packaging; gameplay changes also need validation in Minecraft.
 
 ## License
 
@@ -150,4 +156,4 @@ Contributions are welcome! Please consider:
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: October 2026
