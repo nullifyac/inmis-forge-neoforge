@@ -18,7 +18,6 @@ import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
@@ -34,7 +33,6 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.apache.logging.log4j.LogManager;
@@ -68,7 +66,6 @@ public class Inmis {
             DATA_COMPONENTS.register("backpack", () -> DataComponentType.<BackpackComponent>builder()
                     .persistent(BackpackComponent.CODEC)
                     .networkSynchronized(BackpackComponent.STREAM_CODEC)
-                    .cacheEncoding()
                     .build());
     public static final Supplier<DataComponentType<BackpackAugmentsComponent>> BACKPACK_AUGMENTS =
             DATA_COMPONENTS.register("backpack_augments", () -> DataComponentType.<BackpackAugmentsComponent>builder()
@@ -105,7 +102,6 @@ public class Inmis {
         eventBus.addListener(this::commonSetup);
         eventBus.addListener(Inmis::buildCreativeTab);
         eventBus.addListener(ServerNetworking::registerPayloadHandlers);
-        NeoForge.EVENT_BUS.addListener(Inmis::onLivingDrops);
         NeoForge.EVENT_BUS.addListener(Inmis::registerCommands);
         NeoForge.EVENT_BUS.addListener(BackpackedMigrationManager::onPlayerLogin);
     }
@@ -114,12 +110,6 @@ public class Inmis {
         InmisConfig defaultConfig = new InmisConfig();
 
         for (BackpackInfo backpack : CONFIG.backpacks) {
-            Item.Properties properties = new Item.Properties().stacksTo(1);
-
-            if (backpack.isFireImmune()) {
-                properties.fireResistant();
-            }
-
             if (backpack.getOpenSound() == null) {
                 Optional<BackpackInfo> any = defaultConfig.backpacks.stream()
                         .filter(info -> info.getName().equals(backpack.getName()))
@@ -133,13 +123,20 @@ public class Inmis {
                 }
             }
 
-            BackpackItem item = backpack.isDyeable()
-                    ? new DyeableBackpackItem(backpack, properties)
-                    : new BackpackItem(backpack, properties);
             Supplier<BackpackItem> registered =
-                    ITEMS.register(backpack.getName().toLowerCase() + "_backpack", () -> item);
+                    ITEMS.register(backpack.getName().toLowerCase(java.util.Locale.ROOT) + "_backpack", () -> createBackpackItem(backpack));
             BACKPACKS.add(registered);
         }
+    }
+
+    private static BackpackItem createBackpackItem(BackpackInfo backpack) {
+        Item.Properties properties = new Item.Properties().stacksTo(1);
+        if (backpack.isFireImmune()) {
+            properties.fireResistant();
+        }
+        return backpack.isDyeable()
+                ? new DyeableBackpackItem(backpack, properties)
+                : new BackpackItem(backpack, properties);
     }
 
     private static void registerCommands(RegisterCommandsEvent event) {
@@ -147,10 +144,10 @@ public class Inmis {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
-        if (CURIOS_LOADED && CONFIG.enableTrinketCompatibility) {
+        if (CURIOS_LOADED) {
             event.enqueueWork(draylar.inmis.compat.CuriosCompat::registerCurios);
         }
-        if (ACCESSORIES_LOADED && CONFIG.enableTrinketCompatibility) {
+        if (ACCESSORIES_LOADED) {
             event.enqueueWork(draylar.inmis.compat.AccessoriesCompat::registerAccessories);
         }
     }
@@ -164,47 +161,30 @@ public class Inmis {
         }
     }
 
-    public static void onLivingDrops(LivingDropsEvent event) {
-        if (!(event.getEntity() instanceof Player player)) {
+    public static void spillVanillaInventoryOnDeath(Player player) {
+        if (player.level().isClientSide || player.level().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY)) {
             return;
         }
-
-        if (player.level().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY)) {
-            return;
-        }
-
         if (CONFIG.spillArmorBackpacksOnDeath) {
-            spillInventory(player, player.getInventory().armor, event);
-            if (CURIOS_LOADED && CONFIG.enableTrinketCompatibility) {
-                draylar.inmis.compat.CuriosCompat.spillCurios(player, event);
-            }
-            if (ACCESSORIES_LOADED && CONFIG.enableTrinketCompatibility) {
-                draylar.inmis.compat.AccessoriesCompat.spillAccessories(player, event);
-            }
+            spillInventoryBeforeDrop(player, player.getInventory().armor);
         }
-
         if (CONFIG.spillMainBackpacksOnDeath) {
-            spillInventory(player, player.getInventory().items, event);
-            spillInventory(player, player.getInventory().offhand, event);
+            spillInventoryBeforeDrop(player, player.getInventory().items);
+            spillInventoryBeforeDrop(player, player.getInventory().offhand);
         }
     }
 
-    private static void spillInventory(Player player, List<ItemStack> items, LivingDropsEvent event) {
-        for (int i = 0; i < items.size(); i++) {
-            ItemStack stack = items.get(i);
+    private static void spillInventoryBeforeDrop(Player player, List<ItemStack> items) {
+        for (ItemStack stack : items) {
             if (stack.getItem() instanceof BackpackItem) {
-                ItemStack original = stack.copy();
-                event.getDrops().removeIf(drop -> ItemStack.isSameItemSameComponents(drop.getItem(), original));
-
                 for (ItemStack contents : Inmis.getBackpackContents(stack)) {
                     if (!contents.isEmpty()) {
-                        event.getDrops().add(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), contents));
+                        player.drop(contents, true, false);
                     }
                 }
-
                 Inmis.wipeBackpack(stack);
-                event.getDrops().add(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), stack.copy()));
-                items.set(i, ItemStack.EMPTY);
+                // Leave the empty source backpack for vanilla Inventory.dropAll. Both the bag and
+                // its contents then share the normal captured LivingDrops cancellation pipeline.
             }
         }
     }
@@ -278,7 +258,8 @@ public class Inmis {
         }
 
         List<ItemStack> stacks = component.stacks();
-        if (stacks.size() == size) {
+        // Saved overflow remains available through recovery rows after a config capacity reduction.
+        if (stacks.size() >= size) {
             return component;
         }
 

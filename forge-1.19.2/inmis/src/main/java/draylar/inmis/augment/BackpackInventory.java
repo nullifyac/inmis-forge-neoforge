@@ -4,6 +4,7 @@ import draylar.inmis.Inmis;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.item.component.BackpackAugmentsComponent;
+import draylar.inmis.util.BackpackStorage;
 import draylar.inmis.util.InventoryUtils;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.nbt.ListTag;
@@ -24,10 +25,15 @@ public class BackpackInventory extends SimpleContainer implements WorldlyContain
 
     private final ItemStack backpackStack;
     private final BackpackInfo tier;
+    private boolean loading = true;
     private final int[] availableSlots;
 
     public BackpackInventory(ItemStack backpackStack, BackpackInfo tier) {
-        super(Math.max(0, tier.getRowWidth() * tier.getNumberOfRows()));
+        this(backpackStack, tier, BackpackStorage.getRequiredSize(backpackStack, tier));
+    }
+
+    public BackpackInventory(ItemStack backpackStack, BackpackInfo tier, int size) {
+        super(Math.max(0, size));
         this.backpackStack = backpackStack;
         this.tier = tier;
 
@@ -38,6 +44,7 @@ public class BackpackInventory extends SimpleContainer implements WorldlyContain
 
         ListTag tag = Inmis.getOrCreateInventory(backpackStack, tier);
         InventoryUtils.fromTag(tag, this);
+        loading = false;
     }
 
     public ItemStack getBackpackStack() {
@@ -46,13 +53,52 @@ public class BackpackInventory extends SimpleContainer implements WorldlyContain
 
     @Override
     public void setChanged() {
+        if (loading) {
+            return;
+        }
         backpackStack.getOrCreateTag().put("Inventory", InventoryUtils.toTag(this));
         super.setChanged();
     }
 
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
-        return super.canPlaceItem(slot, stack) && isAllowedItem(stack);
+        return slot >= 0 && slot < tier.getRowWidth() * tier.getNumberOfRows()
+                && slot < getContainerSize() && super.canPlaceItem(slot, stack) && isAllowedItem(stack);
+    }
+
+    @Override
+    public ItemStack addItem(ItemStack stack) {
+        // SimpleContainer.addItem bypasses canPlaceItem, including nesting and recovery-slot restrictions.
+        ItemStack remaining = stack.copy();
+        if (remaining.isEmpty() || !isAllowedItem(remaining)) {
+            return remaining;
+        }
+        boolean changed = false;
+        for (int i = 0; i < getContainerSize() && !remaining.isEmpty(); i++) {
+            ItemStack existing = getItem(i);
+            if (!canPlaceItem(i, remaining) || existing.isEmpty()
+                    || !ItemStack.isSameItemSameTags(existing, remaining)) {
+                continue;
+            }
+            int limit = Math.min(getMaxStackSize(), existing.getMaxStackSize());
+            int moved = Math.min(remaining.getCount(), Math.max(0, limit - existing.getCount()));
+            if (moved > 0) {
+                existing.grow(moved);
+                remaining.shrink(moved);
+                changed = true;
+            }
+        }
+        for (int i = 0; i < getContainerSize() && !remaining.isEmpty(); i++) {
+            if (canPlaceItem(i, remaining) && getItem(i).isEmpty()) {
+                int moved = Math.min(remaining.getCount(), Math.min(getMaxStackSize(), remaining.getMaxStackSize()));
+                setItem(i, remaining.split(moved));
+                changed = true;
+            }
+        }
+        if (changed) {
+            setChanged();
+        }
+        return remaining;
     }
 
     @Override
@@ -91,6 +137,10 @@ public class BackpackInventory extends SimpleContainer implements WorldlyContain
     }
 
     public boolean isAllowedItem(ItemStack stack) {
+        return isAllowedStack(stack);
+    }
+
+    public static boolean isAllowedStack(ItemStack stack) {
         if (stack.getItem() instanceof BackpackItem) {
             return false;
         }

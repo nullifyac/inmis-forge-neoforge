@@ -4,6 +4,7 @@ import draylar.inmis.Inmis;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.item.component.BackpackAugmentsComponent;
+import draylar.inmis.ui.BackpackScreenHandler;
 import draylar.inmis.mixin.AbstractArrowAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -58,10 +59,11 @@ public final class BackpackAugmentHandler {
             return false;
         }
 
+        Item pickedUpItem = stack.getItem();
         FunnelResult result = funnelItemStackIntoBackpacks(player, stack);
         if (result.funnelCount() > 0) {
             player.take(entity, result.funnelCount());
-            player.awardStat(net.minecraft.stats.Stats.ITEM_PICKED_UP.get(stack.getItem()), result.funnelCount());
+            player.awardStat(net.minecraft.stats.Stats.ITEM_PICKED_UP.get(pickedUpItem), result.funnelCount());
             player.onItemPickup(entity);
         }
 
@@ -525,7 +527,7 @@ public final class BackpackAugmentHandler {
             if (!isAugmentEnabled(augment, augments)) {
                 continue;
             }
-            snapshots.add(new BackpackSnapshot(stack, tier, augments, new BackpackInventory(stack, tier)));
+            snapshots.add(new BackpackSnapshot(stack, tier, augments, getBackpackInventory(player, stack, tier)));
         }
         return snapshots;
     }
@@ -552,13 +554,23 @@ public final class BackpackAugmentHandler {
             if (!isAugmentEnabled(first, augments) || !isAugmentEnabled(second, augments)) {
                 continue;
             }
-            snapshots.add(new BackpackSnapshot(stack, tier, augments, new BackpackInventory(stack, tier)));
+            snapshots.add(new BackpackSnapshot(stack, tier, augments, getBackpackInventory(player, stack, tier)));
         }
         return snapshots;
     }
 
     public static boolean hasLootboundBackpacks(Player player) {
         return !getSnapshotsWithAugments(player, BackpackAugmentType.FUNNELLING, BackpackAugmentType.LOOTBOUND).isEmpty();
+    }
+
+    private static BackpackInventory getBackpackInventory(Player player, ItemStack stack, BackpackInfo tier) {
+        if (player.containerMenu instanceof BackpackScreenHandler menu && menu.getBackpackStack() == stack) {
+            BackpackInventory inventory = menu.getBackpackInventory();
+            if (inventory != null) {
+                return inventory;
+            }
+        }
+        return new BackpackInventory(stack, tier);
     }
 
     private static boolean isAugmentEnabled(BackpackAugmentType augment, BackpackAugmentsComponent augments) {

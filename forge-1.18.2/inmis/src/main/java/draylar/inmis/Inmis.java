@@ -15,17 +15,13 @@ import draylar.inmis.ui.BackpackScreenHandler;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameRules;
 import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -94,7 +90,7 @@ public class Inmis {
             }
 
             RegistryObject<BackpackItem> registered =
-                    ITEMS.register(backpack.getName().toLowerCase() + "_backpack", () -> createBackpackItem(backpack));
+                    ITEMS.register(backpack.getName().toLowerCase(java.util.Locale.ROOT) + "_backpack", () -> createBackpackItem(backpack));
             BACKPACKS.add(registered);
         }
     }
@@ -112,8 +108,15 @@ public class Inmis {
     @Mod.EventBusSubscriber(modid = MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
     public static class ModEvents {
         @SubscribeEvent
+        public static void enqueueInterMod(net.minecraftforge.fml.event.lifecycle.InterModEnqueueEvent event) {
+            if (CURIOS_LOADED) {
+                draylar.inmis.compat.CuriosCompat.registerBackSlot();
+            }
+        }
+
+        @SubscribeEvent
         public static void commonSetup(FMLCommonSetupEvent event) {
-            if (CURIOS_LOADED && CONFIG.enableTrinketCompatibility) {
+            if (CURIOS_LOADED) {
                 event.enqueueWork(() -> draylar.inmis.compat.CuriosCompat.registerCurios());
             }
         }
@@ -123,49 +126,6 @@ public class Inmis {
     public static class ForgeEvents {
 
         @SubscribeEvent
-        public static void onLivingDrops(LivingDropsEvent event) {
-            if (!(event.getEntity() instanceof Player player)) {
-                return;
-            }
-
-            if (player.level.getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY)) {
-                return;
-            }
-
-            if (CONFIG.spillArmorBackpacksOnDeath) {
-                spillInventory(player, player.getInventory().armor, event);
-                if (CURIOS_LOADED && CONFIG.enableTrinketCompatibility) {
-                    draylar.inmis.compat.CuriosCompat.spillCurios(player, event);
-                }
-            }
-
-            if (CONFIG.spillMainBackpacksOnDeath) {
-                spillInventory(player, player.getInventory().items, event);
-                spillInventory(player, player.getInventory().offhand, event);
-            }
-        }
-
-        private static void spillInventory(Player player, List<ItemStack> items, LivingDropsEvent event) {
-            for (int i = 0; i < items.size(); i++) {
-                ItemStack stack = items.get(i);
-                if (stack.getItem() instanceof BackpackItem) {
-                    ItemStack original = stack.copy();
-                    event.getDrops().removeIf(drop -> ItemStack.isSameItemSameTags(drop.getItem(), original));
-
-                    for (ItemStack contents : Inmis.getBackpackContents(stack)) {
-                        if (!contents.isEmpty()) {
-                            event.getDrops().add(new ItemEntity(player.level, player.getX(), player.getY(), player.getZ(), contents));
-                        }
-                    }
-
-                    Inmis.wipeBackpack(stack);
-                    event.getDrops().add(new ItemEntity(player.level, player.getX(), player.getY(), player.getZ(), stack.copy()));
-                    items.set(i, ItemStack.EMPTY);
-                }
-            }
-        }
-
-        @SubscribeEvent
         public static void registerCommands(RegisterCommandsEvent event) {
             BackpackedConversionCommand.register(event.getDispatcher());
         }
@@ -173,6 +133,31 @@ public class Inmis {
         @SubscribeEvent
         public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
             draylar.inmis.compat.BackpackedMigrationManager.onPlayerLogin(event);
+        }
+    }
+
+    public static void spillVanillaInventoryOnDeath(Player player) {
+        if (CONFIG.spillArmorBackpacksOnDeath) {
+            spillInventoryContents(player, player.getInventory().armor);
+        }
+        if (CONFIG.spillMainBackpacksOnDeath) {
+            spillInventoryContents(player, player.getInventory().items);
+            spillInventoryContents(player, player.getInventory().offhand);
+        }
+    }
+
+    private static void spillInventoryContents(Player player, List<ItemStack> items) {
+        for (ItemStack stack : items) {
+            if (stack.getItem() instanceof BackpackItem) {
+                for (ItemStack contents : getBackpackContents(stack)) {
+                    if (!contents.isEmpty()) {
+                        // Use vanilla's death-drop path so Forge captures and cancels these drops together.
+                        player.drop(contents, true, false);
+                    }
+                }
+                wipeBackpack(stack);
+                // Inventory.dropAll will drop this exact, now-empty backpack once.
+            }
         }
     }
 

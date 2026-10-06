@@ -30,6 +30,12 @@ public class InventoryUtils {
             CompoundTag stackTag = (CompoundTag) element;
             int slot = stackTag.getInt("Slot");
             ItemStack stack = ItemStack.of(stackTag.getCompound("Stack"));
+            if (stack.isEmpty()) {
+                return;
+            }
+            if (slot < 0 || slot >= inventory.getContainerSize()) {
+                throw new IllegalArgumentException("Occupied backpack slot is outside the inventory: " + slot);
+            }
             inventory.setItem(slot, stack);
         });
     }

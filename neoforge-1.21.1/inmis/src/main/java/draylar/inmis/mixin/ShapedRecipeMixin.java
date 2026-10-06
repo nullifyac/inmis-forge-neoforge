@@ -38,6 +38,8 @@ public abstract class ShapedRecipeMixin {
         if (newBackpack.getItem() instanceof BackpackItem backpackItem) {
             int size = backpackItem.getTier().getRowWidth() * backpackItem.getTier().getNumberOfRows();
             List<ItemStack> contents = Inmis.getBackpackContents(centerSlot);
+            // Preserve recovery slots even if the target tier's configured capacity is smaller.
+            size = Math.max(size, contents.size());
             List<ItemStack> newContents = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
                 if (i < contents.size()) {

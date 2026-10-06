@@ -3,104 +3,125 @@ package draylar.inmis.ui;
 import draylar.inmis.Inmis;
 import draylar.inmis.api.Dimension;
 import draylar.inmis.api.Point;
+import draylar.inmis.augment.BackpackAugmentHelper;
+import draylar.inmis.augment.BackpackInventory;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.item.BackpackItem;
-import draylar.inmis.item.component.BackpackComponent;
-import net.minecraft.core.registries.BuiltInRegistries;
+import draylar.inmis.util.BackpackStorage;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.ShulkerBoxBlock;
-
-import java.util.List;
 
 public class BackpackScreenHandler extends AbstractContainerMenu {
 
     private final ItemStack backpackStack;
+    private final int rowWidth;
+    private final int numberOfRows;
+    private final int configuredSize;
+    private final int lockedPlayerSlot;
+    private final Container backpackInventory;
     private final int padding = 8;
     private final int titleSpace = 10;
 
     public BackpackScreenHandler(int synchronizationID, Inventory playerInventory, RegistryFriendlyByteBuf packetByteBuf) {
-        this(synchronizationID, playerInventory, ItemStack.STREAM_CODEC.decode(packetByteBuf));
+        this(synchronizationID, playerInventory, ItemStack.STREAM_CODEC.decode(packetByteBuf),
+                packetByteBuf.readVarInt(), packetByteBuf.readVarInt(), packetByteBuf.readVarInt(),
+                packetByteBuf.readInt(), true);
     }
 
     public BackpackScreenHandler(int synchronizationID, Inventory playerInventory, ItemStack backpackStack) {
-        super(Inmis.CONTAINER_TYPE.get(), synchronizationID);
-        this.backpackStack = backpackStack;
-
-        if (backpackStack.getItem() instanceof BackpackItem) {
-            setupContainer(playerInventory, backpackStack);
-        } else {
-            Player player = playerInventory.player;
-            this.removed(player);
-        }
+        this(synchronizationID, playerInventory, backpackStack,
+                ((BackpackItem) backpackStack.getItem()).getTier().getRowWidth(),
+                BackpackStorage.getRequiredRows(backpackStack, ((BackpackItem) backpackStack.getItem()).getTier()),
+                Math.multiplyExact(((BackpackItem) backpackStack.getItem()).getTier().getRowWidth(),
+                        ((BackpackItem) backpackStack.getItem()).getTier().getNumberOfRows()),
+                findPlayerSlot(playerInventory, backpackStack), false);
     }
 
-    private void setupContainer(Inventory playerInventory, ItemStack backpackStack) {
-        Dimension dimension = getDimension();
-        BackpackInfo tier = getItem().getTier();
-        int rowWidth = tier.getRowWidth();
-        int numberOfRows = tier.getNumberOfRows();
-        int size = rowWidth * numberOfRows;
-
-        BackpackComponent component = Inmis.getOrCreateComponent(backpackStack, tier);
-
-        BackpackInventory inventory = new BackpackInventory(size) {
-            @Override
-            public void setChanged() {
-                backpackStack.set(Inmis.BACKPACK_COMPONENT.get(), BackpackComponent.fromContainer(this));
-                super.setChanged();
-            }
-        };
-
-        List<ItemStack> stacks = component.stacks();
-        for (int i = 0; i < size; i++) {
-            inventory.setItem(i, i < stacks.size() ? stacks.get(i) : ItemStack.EMPTY);
+    private BackpackScreenHandler(int synchronizationID, Inventory playerInventory, ItemStack backpackStack,
+                                  int rowWidth, int numberOfRows, int configuredSize, int lockedPlayerSlot,
+                                  boolean clientMenu) {
+        super(Inmis.CONTAINER_TYPE.get(), synchronizationID);
+        if (!(backpackStack.getItem() instanceof BackpackItem)
+                || rowWidth <= 0 || numberOfRows <= 0 || configuredSize <= 0
+                || (long) rowWidth * numberOfRows > Short.MAX_VALUE - 36L
+                || configuredSize > (long) rowWidth * numberOfRows
+                || rowWidth * 18L + 16 > Integer.MAX_VALUE
+                || (numberOfRows + 4L) * 18 + 44 > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Invalid backpack menu dimensions");
         }
+        this.backpackStack = backpackStack;
+        this.rowWidth = rowWidth;
+        this.numberOfRows = numberOfRows;
+        this.configuredSize = configuredSize;
+        this.lockedPlayerSlot = lockedPlayerSlot;
+        // The client receives slots through the normal menu sync; it must never resize saved contents using its config.
+        this.backpackInventory = clientMenu
+                ? new SimpleContainer(rowWidth * numberOfRows)
+                : new BackpackInventory(backpackStack, getItem().getTier(), rowWidth * numberOfRows);
+        setupContainer(playerInventory);
+    }
 
+    public static void writeOpeningData(RegistryFriendlyByteBuf packetByteBuf, Inventory playerInventory, ItemStack backpackStack) {
+        BackpackInfo tier = ((BackpackItem) backpackStack.getItem()).getTier();
+        ItemStack.STREAM_CODEC.encode(packetByteBuf, backpackStack);
+        packetByteBuf.writeVarInt(tier.getRowWidth());
+        packetByteBuf.writeVarInt(BackpackStorage.getRequiredRows(backpackStack, tier));
+        packetByteBuf.writeVarInt(Math.multiplyExact(tier.getRowWidth(), tier.getNumberOfRows()));
+        packetByteBuf.writeInt(findPlayerSlot(playerInventory, backpackStack));
+    }
+
+    private static int findPlayerSlot(Inventory playerInventory, ItemStack backpackStack) {
+        for (int slot = 0; slot < playerInventory.getContainerSize(); slot++) {
+            if (playerInventory.getItem(slot) == backpackStack) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private void setupContainer(Inventory playerInventory) {
+        Dimension dimension = getDimension();
         for (int y = 0; y < numberOfRows; y++) {
             for (int x = 0; x < rowWidth; x++) {
-                Point backpackSlotPosition = getBackpackSlotPosition(dimension, x, y);
-                addSlot(new BackpackLockedSlot(inventory, y * rowWidth + x, backpackSlotPosition.x + 1, backpackSlotPosition.y + 1));
+                Point position = getBackpackSlotPosition(dimension, x, y);
+                addSlot(new BackpackLockedSlot(backpackInventory, y * rowWidth + x, position.x + 1, position.y + 1, false));
             }
         }
-
         for (int y = 0; y < 3; ++y) {
             for (int x = 0; x < 9; ++x) {
-                Point playerInvSlotPosition = getPlayerInvSlotPosition(dimension, x, y);
-                this.addSlot(new BackpackLockedSlot(playerInventory, x + y * 9 + 9, playerInvSlotPosition.x + 1, playerInvSlotPosition.y + 1));
+                int slot = x + y * 9 + 9;
+                Point position = getPlayerInvSlotPosition(dimension, x, y);
+                addSlot(new BackpackLockedSlot(playerInventory, slot, position.x + 1, position.y + 1, slot == lockedPlayerSlot));
             }
         }
-
         for (int x = 0; x < 9; ++x) {
-            Point playerInvSlotPosition = getPlayerInvSlotPosition(dimension, x, 3);
-            this.addSlot(new BackpackLockedSlot(playerInventory, x, playerInvSlotPosition.x + 1, playerInvSlotPosition.y + 1));
+            Point position = getPlayerInvSlotPosition(dimension, x, 3);
+            addSlot(new BackpackLockedSlot(playerInventory, x, position.x + 1, position.y + 1, x == lockedPlayerSlot));
         }
-
-        backpackStack.set(Inmis.BACKPACK_COMPONENT.get(), BackpackComponent.fromContainer(inventory));
     }
 
     public BackpackItem getItem() {
         return (BackpackItem) backpackStack.getItem();
     }
 
+    public BackpackInventory getBackpackInventory() {
+        return backpackInventory instanceof BackpackInventory inventory ? inventory : null;
+    }
+
     public Dimension getDimension() {
-        BackpackInfo tier = getItem().getTier();
-        return new Dimension(padding * 2 + Math.max(tier.getRowWidth(), 9) * 18,
-                padding * 2 + titleSpace * 2 + 8 + (tier.getNumberOfRows() + 4) * 18);
+        return new Dimension(padding * 2 + Math.max(rowWidth, 9) * 18,
+                padding * 2 + titleSpace * 2 + 8 + (numberOfRows + 4) * 18);
     }
 
     public Point getBackpackSlotPosition(Dimension dimension, int x, int y) {
-        BackpackInfo tier = getItem().getTier();
-        return new Point(dimension.getWidth() / 2 - tier.getRowWidth() * 9 + x * 18, padding + titleSpace + y * 18);
+        return new Point(dimension.getWidth() / 2 - rowWidth * 9 + x * 18, padding + titleSpace + y * 18);
     }
 
     public Point getPlayerInvSlotPosition(Dimension dimension, int x, int y) {
@@ -110,7 +131,15 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return backpackStack.getItem() instanceof BackpackItem;
+        if (player.level().isClientSide) {
+            return true;
+        }
+        for (ItemStack ownedBackpack : BackpackAugmentHelper.getBackpackStacks(player)) {
+            if (ownedBackpack == backpackStack) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public ItemStack getBackpackStack() {
@@ -118,78 +147,70 @@ public class BackpackScreenHandler extends AbstractContainerMenu {
     }
 
     @Override
-    public ItemStack quickMoveStack(Player player, int index) {
-        ItemStack itemStack = ItemStack.EMPTY;
-        Slot slot = this.slots.get(index);
-        if (slot != null && slot.hasItem()) {
-            ItemStack toInsert = slot.getItem();
-            itemStack = toInsert.copy();
-            BackpackInfo tier = getItem().getTier();
-            if (index < tier.getNumberOfRows() * tier.getRowWidth()) {
-                if (!this.moveItemStackTo(toInsert, tier.getNumberOfRows() * tier.getRowWidth(), this.slots.size(), true)) {
-                    return ItemStack.EMPTY;
-                }
-            } else if (!this.moveItemStackTo(toInsert, 0, tier.getNumberOfRows() * tier.getRowWidth(), false)) {
-                return ItemStack.EMPTY;
-            }
-
-            if (toInsert.isEmpty()) {
-                slot.set(ItemStack.EMPTY);
-            } else {
-                slot.setChanged();
-            }
+    public void clicked(int slotId, int button, ClickType clickType, Player player) {
+        // Number-key/offhand swaps access the player inventory directly and can bypass the hovered slot's lock.
+        if (clickType == ClickType.SWAP && button == lockedPlayerSlot) {
+            return;
         }
+        super.clicked(slotId, button, clickType, player);
+    }
 
-        return itemStack;
+    @Override
+    public ItemStack quickMoveStack(Player player, int index) {
+        if (index < 0 || index >= slots.size()) {
+            return ItemStack.EMPTY;
+        }
+        Slot slot = slots.get(index);
+        if (!slot.hasItem() || !slot.mayPickup(player)) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack toInsert = slot.getItem();
+        if (index >= rowWidth * numberOfRows && !BackpackInventory.isAllowedStack(toInsert)) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack original = toInsert.copy();
+        int backpackSize = rowWidth * numberOfRows;
+        boolean moved = index < backpackSize
+                ? moveItemStackTo(toInsert, backpackSize, slots.size(), true)
+                : moveItemStackTo(toInsert, 0, configuredSize, false);
+        if (!moved) {
+            return ItemStack.EMPTY;
+        }
+        if (toInsert.isEmpty()) {
+            slot.set(ItemStack.EMPTY);
+        } else {
+            slot.setChanged();
+        }
+        slot.onTake(player, toInsert);
+        return original;
     }
 
     private class BackpackLockedSlot extends Slot {
 
-        public BackpackLockedSlot(Container inventory, int index, int x, int y) {
+        private final boolean locksOpenBackpack;
+
+        private BackpackLockedSlot(Container inventory, int index, int x, int y, boolean locksOpenBackpack) {
             super(inventory, index, x, y);
+            this.locksOpenBackpack = locksOpenBackpack;
         }
 
         @Override
         public boolean mayPickup(Player player) {
-            return getItem() != backpackStack;
+            // Previously collected backpacks must remain removable; only the backpack being viewed is locked.
+            return !locksOpenBackpack && getItem() != backpackStack;
         }
 
         @Override
         public boolean mayPlace(ItemStack stack) {
-            if (stack == backpackStack) {
+            if (locksOpenBackpack || stack == backpackStack) {
                 return false;
             }
-
-            if (container instanceof BackpackInventory) {
-                if (stack.getItem() instanceof BackpackItem) {
-                    return false;
-                }
-
-                if (Inmis.CONFIG.unstackablesOnly && stack.getMaxStackSize() > 1) {
-                    return false;
-                }
-
-                if (Inmis.CONFIG.disableShulkers) {
-                    Item item = stack.getItem();
-                    if (item instanceof BlockItem blockItem && blockItem.getBlock() instanceof ShulkerBoxBlock) {
-                        return false;
-                    }
-                }
-
-                ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
-                if (id != null && Inmis.CONFIG.blacklist != null && Inmis.CONFIG.blacklist.contains(id.toString())) {
-                    return false;
-                }
+            if (container == backpackInventory) {
+                // Extra rows recover contents after a capacity reduction and do not add usable storage.
+                return getContainerSlot() < configuredSize
+                        && BackpackInventory.isAllowedStack(stack);
             }
-
             return true;
-        }
-    }
-
-    public static class BackpackInventory extends SimpleContainer {
-
-        public BackpackInventory(int slots) {
-            super(slots);
         }
     }
 }

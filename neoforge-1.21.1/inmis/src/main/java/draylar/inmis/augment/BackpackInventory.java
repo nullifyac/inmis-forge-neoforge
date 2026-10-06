@@ -4,6 +4,7 @@ import draylar.inmis.Inmis;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.item.BackpackItem;
 import draylar.inmis.item.component.BackpackAugmentsComponent;
+import draylar.inmis.util.BackpackStorage;
 import draylar.inmis.item.component.BackpackComponent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -22,17 +23,23 @@ public class BackpackInventory extends SimpleContainer {
 
     private final ItemStack backpackStack;
     private final BackpackInfo tier;
+    private boolean loading = true;
 
     public BackpackInventory(ItemStack backpackStack, BackpackInfo tier) {
-        super(Math.max(0, tier.getRowWidth() * tier.getNumberOfRows()));
+        this(backpackStack, tier, BackpackStorage.getRequiredSize(backpackStack, tier));
+    }
+
+    public BackpackInventory(ItemStack backpackStack, BackpackInfo tier, int size) {
+        super(Math.max(0, size));
         this.backpackStack = backpackStack;
         this.tier = tier;
 
         BackpackComponent component = Inmis.getOrCreateComponent(backpackStack, tier);
         List<ItemStack> stacks = component != null ? component.stacks() : List.of();
         for (int i = 0; i < getContainerSize(); i++) {
-            setItem(i, i < stacks.size() ? stacks.get(i) : ItemStack.EMPTY);
+            setItem(i, i < stacks.size() ? stacks.get(i).copy() : ItemStack.EMPTY);
         }
+        loading = false;
     }
 
     public ItemStack getBackpackStack() {
@@ -41,13 +48,52 @@ public class BackpackInventory extends SimpleContainer {
 
     @Override
     public void setChanged() {
+        if (loading) {
+            return;
+        }
         backpackStack.set(Inmis.BACKPACK_COMPONENT.get(), BackpackComponent.fromContainer(this));
         super.setChanged();
     }
 
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
-        return super.canPlaceItem(slot, stack) && isAllowedItem(stack);
+        return slot >= 0 && slot < tier.getRowWidth() * tier.getNumberOfRows()
+                && slot < getContainerSize() && super.canPlaceItem(slot, stack) && isAllowedItem(stack);
+    }
+
+    @Override
+    public ItemStack addItem(ItemStack stack) {
+        // SimpleContainer.addItem bypasses canPlaceItem, including nesting and recovery-slot restrictions.
+        ItemStack remaining = stack.copy();
+        if (remaining.isEmpty() || !isAllowedItem(remaining)) {
+            return remaining;
+        }
+        boolean changed = false;
+        for (int i = 0; i < getContainerSize() && !remaining.isEmpty(); i++) {
+            ItemStack existing = getItem(i);
+            if (!canPlaceItem(i, remaining) || existing.isEmpty()
+                    || !ItemStack.isSameItemSameComponents(existing, remaining)) {
+                continue;
+            }
+            int limit = Math.min(getMaxStackSize(), existing.getMaxStackSize());
+            int moved = Math.min(remaining.getCount(), Math.max(0, limit - existing.getCount()));
+            if (moved > 0) {
+                existing.grow(moved);
+                remaining.shrink(moved);
+                changed = true;
+            }
+        }
+        for (int i = 0; i < getContainerSize() && !remaining.isEmpty(); i++) {
+            if (canPlaceItem(i, remaining) && getItem(i).isEmpty()) {
+                int moved = Math.min(remaining.getCount(), Math.min(getMaxStackSize(), remaining.getMaxStackSize()));
+                setItem(i, remaining.split(moved));
+                changed = true;
+            }
+        }
+        if (changed) {
+            setChanged();
+        }
+        return remaining;
     }
 
     @Override
@@ -79,14 +125,19 @@ public class BackpackInventory extends SimpleContainer {
     }
 
     public boolean isAllowedItem(ItemStack stack) {
+        return isAllowedStack(stack);
+    }
+
+    public static boolean isAllowedStack(ItemStack stack) {
         if (stack.getItem() instanceof BackpackItem) {
             return false;
         }
         if (Inmis.CONFIG.unstackablesOnly && stack.getMaxStackSize() > 1) {
             return false;
         }
-        if (Inmis.CONFIG.disableShulkers && stack.getItem() instanceof BlockItem blockItem) {
-            return !(blockItem.getBlock() instanceof ShulkerBoxBlock);
+        if (Inmis.CONFIG.disableShulkers && stack.getItem() instanceof BlockItem blockItem
+                && blockItem.getBlock() instanceof ShulkerBoxBlock) {
+            return false;
         }
         ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (id != null && Inmis.CONFIG.blacklist != null && Inmis.CONFIG.blacklist.contains(id.toString())) {

@@ -12,13 +12,11 @@
     "ItemEntityMixin",
     "LevelMixin",
     "LivingEntityMixin",
+    "PlayerMixin",
     "PlayerInventoryScreenMixin",
     "ProjectileWeaponItemMixin",
     "ShapedRecipeMixin",
     "RecipeManagerMixin"
-  ],
-  "client": [
-    "ItemStackMixin"
   ],
   "injectors": {
     "defaultRequire": 1

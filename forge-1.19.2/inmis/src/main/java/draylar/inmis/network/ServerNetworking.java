@@ -17,7 +17,7 @@ import java.util.function.Supplier;
 
 public class ServerNetworking {
 
-    private static final String PROTOCOL_VERSION = "1";
+    private static final String PROTOCOL_VERSION = "2";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             Inmis.id("main"),
             () -> PROTOCOL_VERSION,

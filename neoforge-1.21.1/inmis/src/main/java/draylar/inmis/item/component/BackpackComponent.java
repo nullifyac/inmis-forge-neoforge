@@ -14,7 +14,41 @@ import java.util.List;
 public record BackpackComponent(List<ItemStack> stacks) {
 
     public BackpackComponent {
-        stacks = List.copyOf(stacks);
+        stacks = copyStacks(stacks);
+    }
+
+    @Override
+    public List<ItemStack> stacks() {
+        return copyStacks(stacks);
+    }
+
+    private static List<ItemStack> copyStacks(List<ItemStack> stacks) {
+        return stacks.stream().map(ItemStack::copy).toList();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof BackpackComponent component) || stacks.size() != component.stacks.size()) {
+            return false;
+        }
+        for (int i = 0; i < stacks.size(); i++) {
+            if (!ItemStack.matches(stacks.get(i), component.stacks.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 1;
+        for (ItemStack stack : stacks) {
+            hash = 31 * hash + (stack.isEmpty() ? 0 : 31 * ItemStack.hashItemAndComponents(stack) + stack.getCount());
+        }
+        return hash;
     }
 
     public static final Codec<BackpackComponent> CODEC = ItemStack.OPTIONAL_CODEC.listOf()
@@ -29,7 +63,7 @@ public record BackpackComponent(List<ItemStack> stacks) {
     public SimpleContainer toContainer() {
         SimpleContainer container = new SimpleContainer(stacks.size());
         for (int i = 0; i < stacks.size(); i++) {
-            container.setItem(i, stacks.get(i));
+            container.setItem(i, stacks.get(i).copy());
         }
         return container;
     }

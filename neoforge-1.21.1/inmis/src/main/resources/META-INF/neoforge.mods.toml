@@ -21,7 +21,7 @@ side="BOTH"
 [[dependencies.inmis]]
 modId="minecraft"
 type="required"
-versionRange="[${minecraft_version},1.22)"
+versionRange="[${minecraft_version}]"
 ordering="NONE"
 side="BOTH"
 

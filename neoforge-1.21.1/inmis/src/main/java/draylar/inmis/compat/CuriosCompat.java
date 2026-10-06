@@ -2,15 +2,16 @@ package draylar.inmis.compat;
 
 import draylar.inmis.Inmis;
 import draylar.inmis.item.BackpackItem;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.neoforge.common.NeoForge;
+import top.theillusivec4.curios.api.event.CurioDropsEvent;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.SlotResult;
 import top.theillusivec4.curios.api.type.capability.ICurioItem;
-import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
 import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
@@ -27,12 +28,13 @@ public final class CuriosCompat {
     private static final ICurioItem BACKPACK_CURIO = new ICurioItem() {
         @Override
         public boolean canEquip(SlotContext slotContext, ItemStack stack) {
-            return BACK_SLOT.equals(slotContext.identifier());
+            return Inmis.CONFIG.enableTrinketCompatibility && BACK_SLOT.equals(slotContext.identifier());
         }
 
         @Override
         public boolean canUnequip(SlotContext slotContext, ItemStack stack) {
-            if (stack.getItem() instanceof BackpackItem && Inmis.CONFIG.requireEmptyForUnequip) {
+            if (Inmis.CONFIG.enableTrinketCompatibility
+                    && stack.getItem() instanceof BackpackItem && Inmis.CONFIG.requireEmptyForUnequip) {
                 return Inmis.isBackpackEmpty(stack);
             }
             return true;
@@ -42,7 +44,7 @@ public final class CuriosCompat {
     private static final ICurioItem ENDER_POUCH_CURIO = new ICurioItem() {
         @Override
         public boolean canEquip(SlotContext slotContext, ItemStack stack) {
-            return BACK_SLOT.equals(slotContext.identifier());
+            return Inmis.CONFIG.enableTrinketCompatibility && BACK_SLOT.equals(slotContext.identifier());
         }
     };
 
@@ -54,13 +56,14 @@ public final class CuriosCompat {
             return;
         }
         registered = true;
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, CurioDropsEvent.class, CuriosCompat::spillCurioDrops);
 
         for (var backpack : Inmis.BACKPACKS) {
             CuriosApi.registerCurio(backpack.get(), BACKPACK_CURIO);
         }
         CuriosApi.registerCurio(Inmis.ENDER_POUCH.get(), ENDER_POUCH_CURIO);
         CuriosApi.registerCurioPredicate(Inmis.id("backpack"), slotResult ->
-                BACK_SLOT.equals(slotResult.slotContext().identifier())
+                Inmis.CONFIG.enableTrinketCompatibility && BACK_SLOT.equals(slotResult.slotContext().identifier())
                         && (slotResult.stack().getItem() instanceof BackpackItem || slotResult.stack().getItem() == Inmis.ENDER_POUCH.get()));
     }
 
@@ -85,6 +88,9 @@ public final class CuriosCompat {
     }
 
     public static boolean tryEquipBackpack(Player player, ItemStack stack) {
+        if (!Inmis.CONFIG.enableTrinketCompatibility) {
+            return false;
+        }
         if (player.level().isClientSide) {
             return false;
         }
@@ -118,25 +124,31 @@ public final class CuriosCompat {
         return false;
     }
 
-    public static void spillCurios(Player player, LivingDropsEvent event) {
-        CuriosApi.getCuriosInventory(player).ifPresent(handler -> {
-            List<SlotResult> curios = handler.findCurios(stack -> stack.getItem() instanceof BackpackItem);
-            for (SlotResult result : curios) {
-                ItemStack stack = result.stack();
-                ItemStack original = stack.copy();
-                event.getDrops().removeIf(drop -> ItemStack.isSameItemSameComponents(drop.getItem(), original));
+    private static void spillCurioDrops(CurioDropsEvent event) {
+        if (!(event.getEntity() instanceof Player player) || player.level().isClientSide
+                || !Inmis.CONFIG.enableTrinketCompatibility || !Inmis.CONFIG.spillArmorBackpacksOnDeath) {
+            return;
+        }
 
-                for (ItemStack contents : Inmis.getBackpackContents(stack)) {
-                    if (!contents.isEmpty()) {
-                        event.getDrops().add(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), contents));
-                    }
-                }
-
-                Inmis.wipeBackpack(stack);
-                event.getDrops().add(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), stack.copy()));
-                handler.setEquippedCurio(result.slotContext().identifier(), result.slotContext().index(), ItemStack.EMPTY);
+        // Curios has already selected native drops and applied KEEP, DESTROY and Vanishing rules.
+        // Never inspect retained equipped slots or remove item-equal drops from another inventory.
+        for (ItemEntity backpackDrop : List.copyOf(event.getDrops())) {
+            ItemStack stack = backpackDrop.getItem();
+            if (!(stack.getItem() instanceof BackpackItem)) {
+                continue;
             }
-        });
+            for (ItemStack contents : Inmis.getBackpackContents(stack)) {
+                if (!contents.isEmpty()) {
+                    ItemEntity contentDrop = new ItemEntity(player.level(),
+                            backpackDrop.getX(), backpackDrop.getY(), backpackDrop.getZ(), contents);
+                    contentDrop.setPickUpDelay(40);
+                    contentDrop.setDeltaMovement(backpackDrop.getDeltaMovement());
+                    event.getDrops().add(contentDrop);
+                }
+            }
+            Inmis.wipeBackpack(stack);
+            backpackDrop.setItem(stack);
+        }
     }
 
     public static int replaceMatchingStacks(Player player, Predicate<ItemStack> matcher, UnaryOperator<ItemStack> converter) {

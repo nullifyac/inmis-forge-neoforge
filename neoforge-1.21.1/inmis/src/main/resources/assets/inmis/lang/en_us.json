@@ -2,6 +2,7 @@
   "itemGroup.inmis.backpack": "Inmis",
 
   "ui.inmis.backpack": "Backpack",
+  "inmis.error.backpack_capacity": "This backpack's saved contents cannot be opened safely. Your items have been preserved; ask the server administrator to check the log.",
 
   "item.inmis.baby_backpack": "Baby Backpack",
   "item.inmis.ender_pouch": "Ender Pouch",

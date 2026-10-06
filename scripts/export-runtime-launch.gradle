@@ -1,0 +1,26 @@
+// Export ModDevGradle's complete launch settings so an isolated client and
+// server can run together without retaining two Gradle daemons.
+import groovy.json.JsonOutput
+
+gradle.projectsEvaluated {
+    rootProject.tasks.register('exportRuntimeLaunch') {
+        dependsOn 'prepareRuntimeServerRun', 'prepareRuntimeClientRun', 'gameTestClasses'
+        doLast {
+            ['RuntimeServer', 'RuntimeClient'].each { suffix ->
+                def run = rootProject.tasks.getByName('run' + suffix)
+                def launch = [
+                    java: run.javaLauncher.get().executablePath.asFile.absolutePath,
+                    workingDirectory: run.gameDirectory.get().asFile.absolutePath,
+                    classpath: run.classpathProvider.asPath,
+                    mainClass: run.mainClass.get(),
+                    jvmArgs: run.jvmArgs + run.jvmArgumentProviders.collectMany { it.asArguments().toList() },
+                    args: run.args + run.argumentProviders.collectMany { it.asArguments().toList() },
+                    environment: run.environmentProperty.get()
+                ]
+                def target = rootProject.layout.buildDirectory.file('runtime/' + suffix + '-launch.json').get().asFile
+                target.parentFile.mkdirs()
+                target.text = JsonOutput.prettyPrint(JsonOutput.toJson(launch))
+            }
+        }
+    }
+}

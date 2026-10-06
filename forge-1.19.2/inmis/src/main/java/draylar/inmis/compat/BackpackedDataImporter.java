@@ -7,6 +7,9 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public final class BackpackedDataImporter {
 
     private static final String LEGACY_KEY = "Items";
@@ -26,26 +29,38 @@ public final class BackpackedDataImporter {
 
         int size = Math.max(0, info.getRowWidth() * info.getNumberOfRows());
         if (size == 0) {
-            tag.remove(LEGACY_KEY);
             return null;
         }
 
-        ListTag legacy = tag.getList(LEGACY_KEY, Tag.TAG_COMPOUND);
+        ListTag legacy = (ListTag) tag.get(LEGACY_KEY);
+        if (!legacy.isEmpty() && legacy.getElementType() != Tag.TAG_COMPOUND) {
+            return null;
+        }
         ListTag converted = new ListTag();
         boolean hadEntries = !legacy.isEmpty();
         boolean populated = false;
+        Set<Integer> occupiedSlots = new HashSet<>();
 
         for (int i = 0; i < legacy.size(); i++) {
             CompoundTag entry = legacy.getCompound(i);
             int slot = resolveSlot(entry, i);
-            if (slot < 0 || slot >= size) {
-                Inmis.LOGGER.debug("Skipping Backpacked slot {} outside bounds {} for {}", slot, size, stack.getHoverName().getString());
-                continue;
+            if (slot < 0 || slot >= Short.MAX_VALUE - 36) {
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because slot {} cannot be represented by a backpack menu", stack.getHoverName().getString(), slot);
+                return null;
             }
 
             ItemStack imported = ItemStack.of(entry.copy());
             if (imported.isEmpty()) {
-                continue;
+                if (entry.isEmpty() || "minecraft:air".equals(entry.getString("id"))
+                        || (entry.contains("Count", Tag.TAG_ANY_NUMERIC) && entry.getInt("Count") <= 0)) {
+                    continue;
+                }
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because an item could not be decoded", stack.getHoverName().getString());
+                return null;
+            }
+            if (!occupiedSlots.add(slot)) {
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because slot {} contains multiple items", stack.getHoverName().getString(), slot);
+                return null;
             }
 
             CompoundTag stackTag = new CompoundTag();

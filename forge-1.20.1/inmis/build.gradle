@@ -18,10 +18,39 @@ repositories {
     maven { url = 'https://maven.theillusivec4.top/' }
 }
 
+sourceSets {
+    gameTest {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+
+configurations {
+    gameTestImplementation.extendsFrom implementation
+    gameTestRuntimeOnly.extendsFrom runtimeOnly
+}
+
 minecraft {
     mappings channel: 'official', version: project.minecraft_version
 
     runs {
+        gameTestServer {
+            workingDirectory project.file('build/gameTest')
+            property 'forge.gameTestServer', 'true'
+            property 'forge.enabledGameTestNamespaces', 'inmis_game_tests'
+            property 'forge.logging.console.level', 'info'
+            jvmArgs '-Xms512m', '-Xmx2g'
+
+            mods {
+                inmis {
+                    source sourceSets.main
+                }
+                inmis_game_tests {
+                    source sourceSets.gameTest
+                }
+            }
+        }
+
         client {
             workingDirectory project.file('run')
             property 'forge.logging.console.level', 'debug'
@@ -93,6 +122,11 @@ jar {
 }
 
 jar.finalizedBy('reobfJar')
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
 
 publishing {
     publications {

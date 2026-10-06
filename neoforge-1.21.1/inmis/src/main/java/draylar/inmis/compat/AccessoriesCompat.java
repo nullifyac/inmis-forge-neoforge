@@ -5,14 +5,13 @@ import draylar.inmis.item.BackpackItem;
 import io.wispforest.accessories.api.AccessoriesAPI;
 import io.wispforest.accessories.api.AccessoriesCapability;
 import io.wispforest.accessories.api.Accessory;
+import io.wispforest.accessories.api.events.OnDeathCallback;
 import io.wispforest.accessories.api.slot.SlotEntryReference;
 import io.wispforest.accessories.api.slot.SlotReference;
 import net.fabricmc.fabric.api.util.TriState;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,12 +27,13 @@ public final class AccessoriesCompat {
     private static final Accessory BACKPACK_ACCESSORY = new Accessory() {
         @Override
         public boolean canEquip(ItemStack stack, SlotReference reference) {
-            return BACK_SLOT.equals(reference.slotName());
+            return Inmis.CONFIG.enableTrinketCompatibility && BACK_SLOT.equals(reference.slotName());
         }
 
         @Override
         public boolean canUnequip(ItemStack stack, SlotReference reference) {
-            if (stack.getItem() instanceof BackpackItem && Inmis.CONFIG.requireEmptyForUnequip) {
+            if (Inmis.CONFIG.enableTrinketCompatibility
+                    && stack.getItem() instanceof BackpackItem && Inmis.CONFIG.requireEmptyForUnequip) {
                 return Inmis.isBackpackEmpty(stack);
             }
             return Accessory.super.canUnequip(stack, reference);
@@ -41,14 +41,14 @@ public final class AccessoriesCompat {
 
         @Override
         public boolean canEquipFromUse(ItemStack stack) {
-            return Inmis.CONFIG.requireArmorTrinketToOpen;
+            return Inmis.CONFIG.enableTrinketCompatibility && Inmis.CONFIG.requireArmorTrinketToOpen;
         }
     };
 
     private static final Accessory ENDER_POUCH_ACCESSORY = new Accessory() {
         @Override
         public boolean canEquip(ItemStack stack, SlotReference reference) {
-            return BACK_SLOT.equals(reference.slotName());
+            return Inmis.CONFIG.enableTrinketCompatibility && BACK_SLOT.equals(reference.slotName());
         }
 
         @Override
@@ -65,10 +65,20 @@ public final class AccessoriesCompat {
             return;
         }
         registered = true;
+        var spillPhase = Inmis.id("spill_backpacks");
+        OnDeathCallback.EVENT.addPhaseOrdering(net.fabricmc.fabric.api.event.Event.DEFAULT_PHASE, spillPhase);
+        OnDeathCallback.EVENT.register(spillPhase, (state, entity, capability, source, drops) -> {
+            if (state != TriState.FALSE && entity instanceof Player player && !player.level().isClientSide
+                    && Inmis.CONFIG.enableTrinketCompatibility && Inmis.CONFIG.spillArmorBackpacksOnDeath) {
+                spillDroppedAccessories(drops);
+            }
+            return TriState.DEFAULT;
+        });
 
         AccessoriesAPI.registerPredicate(BACKPACK_PREDICATE, (level, slotType, slot, stack) -> {
             if (stack.getItem() instanceof BackpackItem || stack.getItem() == Inmis.ENDER_POUCH.get()) {
-                return TriState.TRUE;
+                return Inmis.CONFIG.enableTrinketCompatibility && BACK_SLOT.equals(slotType.name())
+                        ? TriState.TRUE : TriState.FALSE;
             }
             return TriState.DEFAULT;
         });
@@ -108,6 +118,9 @@ public final class AccessoriesCompat {
     }
 
     public static boolean tryEquipBackpack(Player player, ItemStack stack) {
+        if (!Inmis.CONFIG.enableTrinketCompatibility) {
+            return false;
+        }
         if (player.level().isClientSide) {
             return false;
         }
@@ -134,27 +147,17 @@ public final class AccessoriesCompat {
         return true;
     }
 
-    public static void spillAccessories(Player player, LivingDropsEvent event) {
-        var capability = AccessoriesCapability.get(player);
-        if (capability == null) {
-            return;
-        }
-
-        List<SlotEntryReference> equipped = capability.getEquipped(stack -> stack.getItem() instanceof BackpackItem);
-        for (SlotEntryReference entry : equipped) {
-            ItemStack stack = entry.stack();
-            ItemStack original = stack.copy();
-            event.getDrops().removeIf(drop -> ItemStack.isSameItemSameComponents(drop.getItem(), original));
-
-            for (ItemStack contents : Inmis.getBackpackContents(stack)) {
-                if (!contents.isEmpty()) {
-                    event.getDrops().add(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), contents));
+    private static void spillDroppedAccessories(List<ItemStack> drops) {
+        // The native death callback supplies only stacks selected for dropping, after its own rules.
+        for (ItemStack stack : List.copyOf(drops)) {
+            if (stack.getItem() instanceof BackpackItem) {
+                for (ItemStack contents : Inmis.getBackpackContents(stack)) {
+                    if (!contents.isEmpty()) {
+                        drops.add(contents);
+                    }
                 }
+                Inmis.wipeBackpack(stack);
             }
-
-            Inmis.wipeBackpack(stack);
-            event.getDrops().add(new ItemEntity(player.level(), player.getX(), player.getY(), player.getZ(), stack.copy()));
-            entry.reference().setStack(ItemStack.EMPTY);
         }
     }
 

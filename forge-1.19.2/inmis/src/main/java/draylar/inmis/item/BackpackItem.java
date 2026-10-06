@@ -5,6 +5,7 @@ import draylar.inmis.augment.BackpackAugmentType;
 import draylar.inmis.augment.BackpackAugments;
 import draylar.inmis.config.BackpackInfo;
 import draylar.inmis.ui.BackpackScreenHandler;
+import draylar.inmis.util.BackpackStorage;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -77,9 +78,20 @@ public class BackpackItem extends Item {
 
     public static void openScreen(Player player, ItemStack backpackItemStack) {
         if (!player.level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-            if (backpackItemStack.getItem() instanceof BackpackItem backpackItem) {
-                Inmis.getOrCreateAugments(backpackItemStack, backpackItem.getTier());
+            if (!(backpackItemStack.getItem() instanceof BackpackItem backpackItem) || backpackItemStack.isEmpty()) {
+                return;
             }
+            try {
+                int rows = BackpackStorage.getRequiredRows(backpackItemStack, backpackItem.getTier());
+                if ((long) rows * backpackItem.getTier().getRowWidth() > Short.MAX_VALUE - 36L) {
+                    throw new IllegalArgumentException("Saved contents exceed the supported menu size");
+                }
+            } catch (IllegalArgumentException exception) {
+                player.displayClientMessage(Component.translatable("inmis.error.backpack_capacity"), false);
+                Inmis.LOGGER.error("Cannot open backpack without losing saved contents: {}", exception.getMessage());
+                return;
+            }
+            Inmis.getOrCreateAugments(backpackItemStack, backpackItem.getTier());
             NetworkHooks.openScreen(serverPlayer, new MenuProvider() {
                 @Override
                 public Component getDisplayName() {
@@ -90,7 +102,7 @@ public class BackpackItem extends Item {
                 public @Nullable AbstractContainerMenu createMenu(int syncId, Inventory inv, Player player) {
                     return new BackpackScreenHandler(syncId, inv, backpackItemStack);
                 }
-            }, buf -> buf.writeItem(backpackItemStack));
+            }, buf -> BackpackScreenHandler.writeOpeningData(buf, serverPlayer.getInventory(), backpackItemStack));
         }
     }
 

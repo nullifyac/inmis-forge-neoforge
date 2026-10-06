@@ -12,6 +12,9 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 public final class ConfigManager {
 
@@ -28,16 +31,46 @@ public final class ConfigManager {
             try (BufferedReader reader = Files.newBufferedReader(configPath)) {
                 InmisConfig config = GSON.fromJson(reader, InmisConfig.class);
                 if (config != null) {
+                    validate(config);
                     return config;
                 }
+                throw new IllegalArgumentException("Config must contain a JSON object.");
             } catch (IOException | JsonSyntaxException e) {
-                LOGGER.warn("Failed to read inmis config, regenerating defaults.", e);
+                throw new IllegalStateException("Cannot read " + configPath
+                        + ". Correct the existing file; it has been preserved.", e);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalStateException("Invalid " + configPath
+                        + ": " + e.getMessage() + " The existing file has been preserved.", e);
             }
         }
 
         InmisConfig defaultConfig = new InmisConfig();
         save(configPath, defaultConfig);
         return defaultConfig;
+    }
+
+    static void validate(InmisConfig config) {
+        if (config.backpacks == null) {
+            throw new IllegalArgumentException("backpacks must be a list.");
+        }
+        Set<String> names = new HashSet<>();
+        for (BackpackInfo backpack : config.backpacks) {
+            if (backpack == null || backpack.getName() == null
+                    || backpack.getName().isEmpty()) {
+                throw new IllegalArgumentException("Each backpack must have a name.");
+            }
+            String name = backpack.getName().toLowerCase(Locale.ROOT);
+            if (!name.matches("[a-z0-9/._-]+") || !names.add(name)) {
+                throw new IllegalArgumentException("Invalid or duplicate backpack name: " + name);
+            }
+            long slots = (long) backpack.getRowWidth() * backpack.getNumberOfRows();
+            if (backpack.getRowWidth() <= 0 || backpack.getNumberOfRows() <= 0
+                    || slots > Short.MAX_VALUE - 36) {
+                throw new IllegalArgumentException("Backpack " + name
+                        + " needs positive dimensions and at most " + (Short.MAX_VALUE - 36)
+                        + " slots (the menu protocol uses signed short slot indexes).");
+            }
+        }
     }
 
     private static void save(Path path, InmisConfig config) {

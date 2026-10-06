@@ -6,6 +6,9 @@ out/
 *.war
 **/release/
 
+# Datagen bookkeeping; generated game resources remain tracked.
+**/src/generated/resources/.cache/
+
 # IDE
 .idea/
 .vscode/

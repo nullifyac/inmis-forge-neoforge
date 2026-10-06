@@ -26,11 +26,11 @@ public final class ServerNetworking {
     }
 
     public static void registerPayloadHandlers(RegisterPayloadHandlersEvent event) {
-        event.registrar("1").playToServer(
+        event.registrar("2").playToServer(
                 OpenBackpackPayload.TYPE,
                 OpenBackpackPayload.STREAM_CODEC,
                 ServerNetworking::handleOpenBackpack);
-        event.registrar("1").playToServer(
+        event.registrar("2").playToServer(
                 UpdateBackpackAugmentsPayload.TYPE,
                 UpdateBackpackAugmentsPayload.STREAM_CODEC,
                 ServerNetworking::handleUpdateBackpackAugments);

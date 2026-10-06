@@ -7,6 +7,8 @@
 
 This is a port of the original [Fabric version](https://github.com/Draylar/inmis) to Forge and NeoForge modloaders.
 
+Version 2.9.4 is available for the four Minecraft versions listed below. Update both client and server together because the backpack menu protocol changed. Custom backpack names and tier order must agree between them; storage dimensions may differ. Per-version changes are recorded in [the release notes](docs/releases/).
+
 ## Overview
 
 Inmis provides players with customizable backpacks that can be:
@@ -128,7 +130,9 @@ inmis/
 - **Curios**: Optional trinket/accessory integration
 - **Accessories (NeoForge 1.21.1)**: Optional accessory integration
 
-The Inmis projects currently have no automated test sources. `gradlew build` checks compilation, resource processing, and JAR packaging; gameplay changes also need validation in Minecraft.
+NeoForge includes headless JUnit regression tests. `gradlew build` runs these tests and checks compilation, resource processing, and JAR packaging; Forge also reobfuscates its JAR. Separate test source sets run gameplay regressions in real Minecraft GameTest servers across all four branches.
+
+The [feedback audit and runtime results](docs/feedback-audit.md) records confirmed defects, validation evidence and remaining modpack coverage. On Windows, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/validate-feedback.ps1` to build and stage all branches, or use `./scripts/verify-runtime.ps1` to run GameTests and an isolated NeoForge client/server restart check. Each validation run keeps its own artifacts, logs and SHA-256 manifest under `temp/feedback-validation/`. Test code is excluded from release JARs; existing Prism instances and saves are untouched.
 
 ## License
 

@@ -18,8 +18,10 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public final class BackpackedDataImporter {
 
@@ -49,9 +51,13 @@ public final class BackpackedDataImporter {
         }
 
         List<ItemStack> slots = createEmptyList(size);
-        ListTag list = tag.getList(ITEMS_KEY, Tag.TAG_COMPOUND);
+        ListTag list = (ListTag) tag.get(ITEMS_KEY);
+        if (!list.isEmpty() && list.getElementType() != Tag.TAG_COMPOUND) {
+            return null;
+        }
         boolean populatedSlot = false;
         boolean hadEntries = list.size() > 0;
+        Set<Integer> occupiedSlots = new HashSet<>();
         HolderLookup.Provider registries = resolveRegistries();
         if (registries == null) {
             Inmis.LOGGER.warn("Skipping Backpacked import for {} because no registry access is available yet", stack.getHoverName().getString());
@@ -60,18 +66,33 @@ public final class BackpackedDataImporter {
 
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
-            int slot = entry.contains("Slot", Tag.TAG_BYTE) ? entry.getByte("Slot") & 255 : i;
-            if (slot < 0 || slot >= size) {
-                Inmis.LOGGER.debug("Skipping Backpacked slot {} for {} because it exceeds size {}", slot, stack.getHoverName().getString(), size);
-                continue;
+            int slot = entry.contains("Slot", Tag.TAG_BYTE) ? entry.getByte("Slot") & 255
+                    : entry.contains("Slot", Tag.TAG_INT) ? entry.getInt("Slot") : i;
+            if (slot < 0 || slot >= Short.MAX_VALUE - 36) {
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because slot {} cannot be represented by a backpack menu", stack.getHoverName().getString(), slot);
+                return null;
             }
 
             Optional<ItemStack> parsed = ItemStack.parse(registries, entry);
             ItemStack importedStack = parsed.orElse(ItemStack.EMPTY);
-            if (!importedStack.isEmpty()) {
-                slots.set(slot, importedStack);
-                populatedSlot = true;
+            if (importedStack.isEmpty()) {
+                if (entry.isEmpty() || "minecraft:air".equals(entry.getString("id"))
+                        || (entry.contains("count", Tag.TAG_ANY_NUMERIC) && entry.getInt("count") <= 0)) {
+                    continue;
+                }
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because an item could not be decoded", stack.getHoverName().getString());
+                return null;
             }
+            if (!occupiedSlots.add(slot)) {
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because slot {} contains multiple items", stack.getHoverName().getString(), slot);
+                return null;
+            }
+            // Recovery rows expose saved contents beyond the target tier's configured capacity.
+            while (slots.size() <= slot) {
+                slots.add(ItemStack.EMPTY);
+            }
+            slots.set(slot, importedStack);
+            populatedSlot = true;
         }
 
         tag.remove(ITEMS_KEY);

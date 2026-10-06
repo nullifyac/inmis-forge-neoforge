@@ -1,0 +1,15 @@
+modLoader="javafml"
+loaderVersion="[40,)"
+license="MIT"
+
+[[mods]]
+modId="inmis_game_tests"
+version="1"
+displayName="Inmis GameTests"
+
+[[dependencies.inmis_game_tests]]
+modId="inmis"
+mandatory=true
+versionRange="*"
+ordering="AFTER"
+side="BOTH"
