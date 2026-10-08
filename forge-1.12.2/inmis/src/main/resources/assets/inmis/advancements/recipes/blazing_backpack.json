@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "rewards": {
+    "recipes": [
+      "inmis:blazing_backpack"
+    ]
+  },
+  "criteria": {
+    "has_bejeweled_backpack": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "item": "inmis:bejeweled_backpack"
+          }
+        ]
+      }
+    },
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": {
+        "recipe": "inmis:blazing_backpack"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_bejeweled_backpack",
+      "has_the_recipe"
+    ]
+  ]
+}

@@ -3,11 +3,11 @@
 ![Minecraft](https://img.shields.io/badge/Minecraft-Java%20Edition-brightgreen)
 ![License](https://img.shields.io/github/license/Draylar/inmis)
 
-**Inmis** is a backpack mod for Minecraft. This repository maintains ports for **Forge** (1.16.5, 1.18.2, 1.19.2, 1.20.1) and **NeoForge** (1.21.1, 26.1.2).
+**Inmis** is a backpack mod for Minecraft. This repository maintains ports for **Forge** (1.7.10, 1.12.2, 1.16.5, 1.18.2, 1.19.2, 1.20.1) and **NeoForge** (1.21.1, 26.1.2).
 
 This is a port of the original [Fabric version](https://github.com/Draylar/inmis) to Forge and NeoForge modloaders.
 
-Choose the file for your Minecraft version and loader from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/inmis-forge-port), and install the same Inmis version on the client and server. See [the additional version guide](docs/version-expansion.md) for Forge 1.16.5 and NeoForge 26.1.2 setup and development details. Per-version changes are recorded in [the release notes](docs/releases/).
+Choose the file for your Minecraft version and loader from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/inmis-forge-port), and install the same Inmis version on the client and server. See [the version guide](docs/version-expansion.md) for setup and development details. Per-version changes are recorded in [the release notes](docs/releases/).
 
 ## Overview
 
@@ -21,6 +21,10 @@ Inmis provides players with customizable backpacks that can be:
 
 ```
 inmis-forge-neoforge/
+|-- forge-1.7.10/                   # Minecraft 1.7.10 (Forge)
+|   `-- inmis/                      # Main mod and isolated native test sources
+|-- forge-1.12.2/                   # Minecraft 1.12.2 (Forge)
+|   `-- inmis/                      # Main mod and isolated native test sources
 |-- forge-1.16.5/                   # Minecraft 1.16.5 (Forge)
 |   `-- inmis/                      # Main mod and isolated native test sources
 |-- forge-1.18.2/                   # Minecraft 1.18.2 (Forge)
@@ -53,6 +57,8 @@ Each `inmis/` directory is an independent Gradle project. Its build resolves dep
 ## Quick Start
 
 ### Prerequisites
+- JDK 17 to launch the Forge 1.7.10 build, plus an installed JDK 8 toolchain to compile and run it
+- JDK 8 to build and run Forge 1.12.2
 - JDK 17 to launch the Forge 1.16.5 build, plus an installed JDK 8 toolchain to compile and run it
 - Java Development Kit (JDK) 17 for 1.18.2-1.20.1
 - Java Development Kit (JDK) 21 for 1.21.1
@@ -86,7 +92,8 @@ On Windows PowerShell, use `.\gradlew.bat build` from the same directory. The Fo
 - **Filters and Modes**: Configure allow/disallow filters and behavior per upgrade
 
 ### Compatibility
-- **Curios Mod**: Equip backpacks in dedicated Curio slots for enhanced gameplay
+- **Baubles (Forge 1.7.10 and 1.12.2)**: Optional equipment integration
+- **Curios (Forge 1.16.5 and newer, NeoForge)**: Equip backpacks in dedicated Curio slots
 - **Accessories Mod (NeoForge 1.21.1)**: Equip backpacks in Accessories slots
 
 ### Configuration
@@ -97,6 +104,9 @@ Customize gameplay through `config/inmis.json`:
 - Adjust inventory sizes and features
 
 ## Version-Specific Details
+
+### Forge 1.7.10 and 1.12.2
+These ports use native legacy inventories, packets, recipes and optional Baubles integration. Recipes use materials available in their Minecraft version. Quiverlink supports bows; crossbows and tridents are absent from these vanilla versions. Forge 1.7.10 omits Immortal and Reforge because vanilla Totems and Mending are unavailable.
 
 ### Forge Versions (1.16.5, 1.18.2, 1.19.2, 1.20.1)
 Each Forge version includes:
@@ -133,12 +143,13 @@ inmis/
 
 ### Dependencies
 - **Forge/NeoForge**: Modding framework
+- **Baubles (Forge 1.7.10 and 1.12.2)**: Optional equipment integration
 - **Curios**: Optional trinket/accessory integration
 - **Accessories (NeoForge 1.21.1)**: Optional accessory integration
 
 NeoForge includes headless JUnit regression tests. `gradlew build` runs these tests and checks compilation, resource processing, and JAR packaging; Forge also reobfuscates its JAR. Separate test source sets run gameplay regressions in real Minecraft GameTest servers on 1.18.2 and newer. Forge 1.16.5 uses a separate native server regression fixture because that Minecraft version predates GameTest.
 
-The [feedback audit and runtime results](docs/feedback-audit.md) records confirmed defects, validation evidence and remaining modpack coverage. On Windows, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/validate-feedback.ps1` to build and stage all branches, or use `./scripts/verify-runtime.ps1` to run GameTests and isolated NeoForge client/server restart checks. Select `-Versions neoforge-26.1.2 -NeoProfiles none,curios -ClientProfiles none,curios` for the new NeoForge port. Forge 1.16.5 has its own `./scripts/verify-forge16-runtime.ps1` runner. Each validation run keeps its own artifacts, logs and SHA-256 manifest under `temp/feedback-validation/`. Test code is excluded from release JARs; existing Prism instances and saves are untouched.
+The [troubleshooting guide](docs/feedback-audit.md) describes storage safeguards and information useful for bug reports. On Windows, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/validate-feedback.ps1` to build and stage all branches, or use `./scripts/verify-runtime.ps1` to run GameTests and isolated Forge 1.18.2-1.20.1 and NeoForge client/server restart checks. Select `-Versions neoforge-26.1.2 -NeoProfiles none,curios -ClientProfiles none,curios` for NeoForge 26.1.2. Forge 1.16.5 uses `./scripts/verify-forge16-runtime.ps1`; Forge 1.7.10 and 1.12.2 use `./scripts/verify-legacy-runtime.ps1`. The build validator stages artifacts and a SHA-256 manifest; runtime runners retain reports, logs and client screenshots. These outputs remain under the ignored `temp/` directory. Test code is excluded from release JARs.
 
 ## License
 
@@ -159,6 +170,8 @@ Contributions are welcome! Please consider:
 
 | Version | Modloader | Status | Java |
 |---------|-----------|--------|------|
+| 1.7.10  | Forge     | Active | 8    |
+| 1.12.2  | Forge     | Active | 8    |
 | 1.16.5  | Forge     | Active | 8    |
 | 1.18.2  | Forge     | Active | 17   |
 | 1.19.2  | Forge     | Active | 17   |

@@ -1,0 +1,15 @@
+itemGroup.inmis.backpack=Inmis
+ui.inmis.backpack=Mochila
+item.inmis.baby_backpack.name=Minimochila
+item.inmis.ender_pouch.name=Pochete de ender
+item.inmis.frayed_backpack.name=Mochila barata
+item.inmis.plated_backpack.name=Mochila laminada
+item.inmis.gilded_backpack.name=Mochila dourada
+item.inmis.bejeweled_backpack.name=Mochila ornada
+item.inmis.blazing_backpack.name=Mochila ardente
+item.inmis.withered_backpack.name=Mochila do Nether
+item.inmis.endless_backpack.name=Mochila do fim
+inmis.advancement.baby_backpack.title=Já é um começo
+inmis.advancement.baby_backpack.description=Perfeita para dar de presente!
+category.inmis.keybindings=Inmis
+key.inmis.open_backpack=Abrir mochila

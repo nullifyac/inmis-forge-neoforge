@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "beb",
+    "bXb",
+    "bbb"
+  ],
+  "key": {
+    "e": {
+      "item": "minecraft:skull",
+      "data": 5
+    },
+    "b": {
+      "item": "minecraft:end_stone"
+    },
+    "X": {
+      "item": "inmis:withered_backpack"
+    }
+  },
+  "result": {
+    "item": "inmis:endless_backpack"
+  }
+}

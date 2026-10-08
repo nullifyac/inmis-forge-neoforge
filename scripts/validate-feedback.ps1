@@ -8,11 +8,13 @@ Uses the version declared in each project's gradle.properties. Existing build
 outputs are retained; only the exact expected playable JAR is staged.
 #>
 param(
-    [ValidateSet('forge-1.16.5', 'forge-1.18.2', 'forge-1.19.2', 'forge-1.20.1', 'neoforge-1.21.1', 'neoforge-26.1.2')]
-    [string[]]$Versions = @('neoforge-26.1.2', 'neoforge-1.21.1', 'forge-1.20.1', 'forge-1.19.2', 'forge-1.18.2', 'forge-1.16.5'),
+    [ValidateSet('forge-1.7.10', 'forge-1.12.2', 'forge-1.16.5', 'forge-1.18.2', 'forge-1.19.2', 'forge-1.20.1', 'neoforge-1.21.1', 'neoforge-26.1.2')]
+    [string[]]$Versions = @('neoforge-26.1.2', 'neoforge-1.21.1', 'forge-1.20.1', 'forge-1.19.2', 'forge-1.18.2', 'forge-1.16.5', 'forge-1.12.2', 'forge-1.7.10'),
+    [string]$Java8Home = $env:JAVA8_HOME,
     [string]$Java17Home = $env:JAVA17_HOME,
     [string]$Java21Home = $env:JAVA21_HOME,
-    [string]$Java25Home = $env:JAVA25_HOME
+    [string]$Java25Home = $env:JAVA25_HOME,
+    [hashtable]$GradleUserHomes = @{}
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -21,6 +23,7 @@ $validationRoot = Join-Path $repositoryRoot 'temp/feedback-validation'
 $runId = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $runRoot = Join-Path $validationRoot $runId
 $originalJavaHome = $env:JAVA_HOME
+$originalGradleUserHome = $env:GRADLE_USER_HOME
 $originalDebug = $env:DEBUG
 $utf8 = [Text.UTF8Encoding]::new($false)
 $artifacts = [Collections.Generic.List[object]]::new()
@@ -78,7 +81,8 @@ function Find-Jdk([int]$Major, [string]$ExplicitPath) {
     foreach ($candidate in $candidates) {
         $releasePath = Join-Path $candidate 'release'
         if ((Test-Path -LiteralPath $releasePath) -and (Test-Path -LiteralPath (Join-Path $candidate 'bin/javac.exe'))) {
-            if ((Get-Content -LiteralPath $releasePath -Raw) -match ('(?m)^JAVA_VERSION="' + $Major + '(?:\.|"|-)')) {
+            $versionPrefix = if ($Major -eq 8) { '1\.8' } else { [string]$Major }
+            if ((Get-Content -LiteralPath $releasePath -Raw) -match ('(?m)^JAVA_VERSION="' + $versionPrefix + '(?:\.|"|-)')) {
                 return [IO.Path]::GetFullPath($candidate)
             }
         }
@@ -109,6 +113,18 @@ function Read-TomlString([string]$Section, [string]$Key) {
 }
 function Test-ReleaseMetadata([string]$Text, [hashtable]$Properties, [bool]$NeoForge) {
     if ($Text -match '\$\{') { throw 'Packaged mod metadata contains unexpanded placeholders.' }
+    if ($Properties.minecraft_version -in @('1.7.10', '1.12.2')) {
+        $mods = @($Text | ConvertFrom-Json)
+        $expectedVersion = "$($Properties.fabric_version)-$($Properties.mod_version)-$($Properties.minecraft_version)"
+        if ($mods.Count -ne 1 -or $mods[0].modid -ne 'inmis' -or
+                $mods[0].version -ne $expectedVersion -or $mods[0].mcversion -ne $Properties.minecraft_version) {
+            throw 'Legacy metadata must declare only Inmis with the exact release and Minecraft versions.'
+        }
+        if ($mods[0].PSObject.Properties.Match('dependencies').Count -and @($mods[0].dependencies).Count) {
+            throw 'Legacy Inmis must run without mandatory equipment mods.'
+        }
+        return [ordered]@{ modId = 'inmis'; version = $mods[0].version; minecraftRange = "[$($Properties.minecraft_version)]" }
+    }
     $sections = @([regex]::Matches($Text, '(?ms)^\[\[([^\]]+)\]\]\s*(.*?)(?=^\[\[|\z)'))
     $mods = @($sections | Where-Object { $_.Groups[1].Value -eq 'mods' })
     if ($mods.Count -ne 1 -or (Read-TomlString $mods[0].Groups[2].Value 'modId') -ne 'inmis') {
@@ -144,13 +160,15 @@ function Test-ReleaseJar([string]$JarPath, [hashtable]$Properties, [bool]$NeoFor
             $_ -match '^data/(inmis_game_tests|inmis_runtime_tests|inmis_smoke_tests)/' -or
             $_ -match '^draylar/inmis/.*(?:Test|Tests)(?:\$[^/]*)?\.class$' -or
             $_ -eq 'draylar/inmis/mixin/ItemStackMixin.class' -or
-            $_ -match '^(top/theillusivec4/curios|io/wispforest/accessories)/'
+            $_ -match '^(top/theillusivec4/curios|io/wispforest/accessories|baubles)/'
         })
         if ($forbidden.Count) { throw "Nonproduction entries found in release JAR: $($forbidden -join ', ')" }
         if ($entryNames -notcontains 'draylar/inmis/util/BackpackStorage.class') {
             throw 'Release JAR does not contain the current backpack storage implementation.'
         }
         $expectedClassVersion = switch ($Properties.minecraft_version) {
+            '1.7.10' { 52 }
+            '1.12.2' { 52 }
             '1.16.5' { 52 }
             '26.1.2' { 69 }
             '1.21.1' { 65 }
@@ -169,20 +187,49 @@ function Test-ReleaseJar([string]$JarPath, [hashtable]$Properties, [bool]$NeoFor
                 }
             } finally { $classReader.Dispose() }
         }
-        $metadataName = if ($NeoForge) { 'META-INF/neoforge.mods.toml' } else { 'META-INF/mods.toml' }
+        $legacy = $Properties.minecraft_version -in @('1.7.10', '1.12.2')
+        if ($legacy) {
+            $loaderEntries = @($entryNames | Where-Object { $_ -match '^(net/minecraft/|net/minecraftforge/|cpw/mods/|com/gtnewhorizons/)' })
+            if ($loaderEntries.Count) { throw 'Legacy release incorrectly embeds Minecraft, Forge or build tooling.' }
+            foreach ($classEntry in @($archive.Entries | Where-Object { $_.FullName -match '\.class$' })) {
+                $classReader = [IO.BinaryReader]::new($classEntry.Open())
+                try {
+                    $header = $classReader.ReadBytes(8)
+                    if ($header.Length -ne 8 -or (([int]$header[6] -shl 8) -bor [int]$header[7]) -gt 52) {
+                        throw "Legacy dependency cannot run on Java 8: $($classEntry.FullName)"
+                    }
+                } finally { $classReader.Dispose() }
+            }
+            $manifestEntry = $archive.GetEntry('META-INF/MANIFEST.MF')
+            if ($null -eq $manifestEntry) { throw 'Legacy release is missing its loader manifest.' }
+            $reader = [IO.StreamReader]::new($manifestEntry.Open())
+            try { $manifest = $reader.ReadToEnd() -replace '\r?\n ', '' } finally { $reader.Dispose() }
+            $bootstrap = [regex]::Match($manifest, '(?m)^FMLCorePlugin: (draylar\.inmis\.[\w.]+)\r?$')
+            if (-not $bootstrap.Success -or $entryNames -notcontains ($bootstrap.Groups[1].Value.Replace('.', '/') + '.class')) {
+                throw 'Legacy release must package its own declared loader bootstrap.'
+            }
+            if ($manifest -notmatch '(?m)^FMLCorePluginContainsFMLMod: true\r?$') {
+                throw 'Legacy loader manifest must also enable discovery of the Inmis mod.'
+            }
+        }
+        $metadataName = if ($legacy) { 'mcmod.info' } elseif ($NeoForge) { 'META-INF/neoforge.mods.toml' } else { 'META-INF/mods.toml' }
         $metadataEntry = $archive.GetEntry($metadataName)
         if ($null -eq $metadataEntry) { throw "Release JAR is missing $metadataName." }
         $reader = [IO.StreamReader]::new($metadataEntry.Open())
         try { $metadataText = $reader.ReadToEnd() } finally { $reader.Dispose() }
         $metadata = Test-ReleaseMetadata $metadataText $Properties $NeoForge
         $mixinsEntry = $archive.GetEntry('inmis.mixins.json')
-        if ($null -eq $mixinsEntry) { throw 'Release JAR is missing its mixin configuration.' }
-        $reader = [IO.StreamReader]::new($mixinsEntry.Open())
-        try { $mixins = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
-        $configuredMixins = @($mixins.mixins)
-        if ($mixins.PSObject.Properties.Match('client').Count) { $configuredMixins += @($mixins.client) }
-        if ($configuredMixins -contains 'ItemStackMixin') {
-            throw 'Release mixin configuration still references obsolete ItemStackMixin.'
+        if ($null -eq $mixinsEntry -and $Properties.minecraft_version -ne '1.7.10') {
+            throw 'Release JAR is missing its mixin configuration.'
+        }
+        if ($null -ne $mixinsEntry) {
+            $reader = [IO.StreamReader]::new($mixinsEntry.Open())
+            try { $mixins = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+            $configuredMixins = @($mixins.mixins)
+            if ($mixins.PSObject.Properties.Match('client').Count) { $configuredMixins += @($mixins.client) }
+            if ($configuredMixins -contains 'ItemStackMixin') {
+                throw 'Release mixin configuration still references obsolete ItemStackMixin.'
+            }
         }
         if ($NeoForge) {
             foreach ($required in @('data/curios/tags/item/back.json', 'data/minecraft/tags/item/dyeable.json')) {
@@ -241,9 +288,10 @@ try {
     foreach ($version in @($Versions | Select-Object -Unique)) {
         $neoForge = $version.StartsWith('neoforge')
         # Forge 1.16.5 compiles Java 8 bytecode through its toolchain, while ForgeGradle runs on JDK 17.
-        $major = if ($version -eq 'neoforge-26.1.2') { 25 } elseif ($neoForge) { 21 } else { 17 }
-        $jdkPath = if ($major -eq 25) { $Java25Home } elseif ($major -eq 21) { $Java21Home } else { $Java17Home }
+        $major = if ($version -eq 'forge-1.12.2') { 8 } elseif ($version -eq 'neoforge-26.1.2') { 25 } elseif ($neoForge) { 21 } else { 17 }
+        $jdkPath = if ($major -eq 8) { $Java8Home } elseif ($major -eq 25) { $Java25Home } elseif ($major -eq 21) { $Java21Home } else { $Java17Home }
         $env:JAVA_HOME = Find-Jdk $major $jdkPath
+        $env:GRADLE_USER_HOME = if ($GradleUserHomes.ContainsKey($version)) { $GradleUserHomes[$version] } else { $originalGradleUserHome }
         $projectPath = Join-Path $repositoryRoot "$version/inmis"
         $properties = Read-GradleProperties (Join-Path $projectPath 'gradle.properties')
         $expectedName = Get-ExpectedJarName $properties
@@ -251,13 +299,14 @@ try {
         $declared = [ordered]@{}
         foreach ($key in @('minecraft_version', 'fabric_version', 'mod_version', 'archives_base_name',
                 'forge_version', 'neoforge_version', 'curios_version', 'curios_version_range',
-                'accessories_version', 'accessories_version_range')) {
+                'accessories_version', 'accessories_version_range', 'baubles_version')) {
             if ($properties.ContainsKey($key)) { $declared[$key] = $properties[$key] }
         }
         $jdkRelease = Get-Content -LiteralPath (Join-Path $env:JAVA_HOME 'release') -Raw
         $jdkVersion = [regex]::Match($jdkRelease, '(?m)^JAVA_VERSION="([^"]+)"').Groups[1].Value
         $build = [pscustomobject]@{
             version = $version; status = 'RUNNING'; javaHome = $env:JAVA_HOME
+            gradleUserHome = $env:GRADLE_USER_HOME
             javaVersion = $jdkVersion; properties = $declared; expectedFile = $expectedName; log = $logPath
         }
         $builds.Add($build)
@@ -282,7 +331,8 @@ try {
             throw "Expected playable mod JAR is missing: $sourceJar"
         }
         $verification = Test-ReleaseJar $sourceJar $properties $neoForge
-        $processedMetadata = Join-Path $projectPath "build/resources/main/$($verification.metadataName)"
+        $resourceDirectory = if ($version -eq 'forge-1.12.2') { 'build/sourceSets/main' } else { 'build/resources/main' }
+        $processedMetadata = Join-Path $projectPath "$resourceDirectory/$($verification.metadataName)"
         if (-not (Test-Path -LiteralPath $processedMetadata -PathType Leaf) -or
             [IO.File]::ReadAllText($processedMetadata) -cne $verification.metadataText) {
             throw 'Packaged metadata differs from the processed production resource.'
@@ -319,5 +369,6 @@ try {
     if ($runCreated) { Save-Provenance }
     if ($validationLock) { $validationLock.Dispose() }
     $env:JAVA_HOME = $originalJavaHome
+    $env:GRADLE_USER_HOME = $originalGradleUserHome
     $env:DEBUG = $originalDebug
 }

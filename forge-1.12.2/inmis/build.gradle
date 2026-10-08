@@ -1,0 +1,197 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net/' }
+        maven { url = 'https://repo.spongepowered.org/maven/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'net.minecraftforge.gradle:ForgeGradle:3.0.197'
+        classpath 'org.spongepowered:mixingradle:0.7.38'
+    }
+}
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'org.spongepowered.mixin'
+apply plugin: 'maven-publish'
+
+group = project.maven_group
+version = "${project.fabric_version}-${project.mod_version}-${project.minecraft_version}"
+archivesBaseName = project.archives_base_name
+sourceCompatibility = targetCompatibility = JavaVersion.VERSION_1_8
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.spongepowered.org/maven/' }
+    maven { url = 'https://maven.blamejared.com/' }
+    maven { url = 'https://www.cursemaven.com/' }
+}
+configurations { embeddedMixin }
+task legacyMixinJar(type: Zip) {
+    archiveName = 'mixin-0.8.5-launchwrapper-java8.jar'
+    destinationDir = file("$buildDir/legacyDependencies")
+    from { configurations.embeddedMixin.collect { zipTree(it) } }
+    exclude 'module-info.class', 'org/spongepowered/asm/launch/MixinLaunchPlugin.class',
+            'org/spongepowered/asm/launch/MixinTransformationService.class',
+            'org/spongepowered/asm/launch/platform/container/ContainerHandleModLauncherEx*.class',
+            'META-INF/services/cpw.mods.*',
+            'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+    filesMatching('META-INF/services/org.spongepowered.asm.service.*') {
+        filter { line -> line.startsWith('org.spongepowered.asm.service.modlauncher.') ? null : line }
+    }
+}
+sourceSets {
+    smokeTest {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+configurations {
+    smokeTestImplementation.extendsFrom implementation
+    smokeTestCompileOnly.extendsFrom compileOnly
+    smokeTestRuntimeOnly.extendsFrom runtimeOnly
+}
+def compatProfile = (project.findProperty('compatProfile') ?: 'none').toString()
+if (!(compatProfile in ['none', 'baubles'])) throw new GradleException('compatProfile must be none or baubles')
+minecraft {
+    mappings channel: 'snapshot', version: '20171003-1.12'
+    runs {
+        client {
+            workingDirectory project.file('run/client')
+            property 'forge.logging.console.level', 'info'
+            jvmArgs '-Xms512m', '-Xmx2g'
+            args '--tweakClass', 'org.spongepowered.asm.launch.MixinTweaker', '--mixin', 'inmis.mixins.json'
+            mods { inmis { source sourceSets.main } }
+        }
+        server {
+            workingDirectory project.file('run/server')
+            property 'forge.logging.console.level', 'info'
+            jvmArgs '-Xms512m', '-Xmx2g'
+            args '--tweakClass', 'org.spongepowered.asm.launch.MixinTweaker', '--mixin', 'inmis.mixins.json', 'nogui'
+            mods { inmis { source sourceSets.main } }
+        }
+        smokeTestServer {
+            parent minecraft.runs.server
+            workingDirectory project.file("build/smokeTest/${compatProfile}")
+            property 'inmis.serverChecks', 'true'
+            property 'inmis.compatProfile', compatProfile
+            mods { inmis_smoke_tests { source sourceSets.smokeTest } }
+        }
+        runtimeServer {
+            parent minecraft.runs.server
+            workingDirectory project.file('build/runtime/server')
+            property 'inmis.smokeServer', 'true'
+            mods { inmis_smoke_tests { source sourceSets.smokeTest } }
+        }
+        runtimeClient {
+            parent minecraft.runs.client
+            workingDirectory project.file('build/runtime/client')
+            property 'inmis.smokeClient', 'true'
+            args '--username', 'Dev', '--width', '1280', '--height', '720'
+            mods { inmis_smoke_tests { source sourceSets.smokeTest } }
+        }
+    }
+}
+dependencies {
+    minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
+    // Later MergeTool APIs contain a BUKKIT enum value incompatible with native FML 1.12.
+    // This official two-side API is a development classpath dependency; it is never embedded.
+    implementation('net.minecraftforge:mergetool:0.2.3.3:forge') { force = true; transitive = false }
+    implementation files(legacyMixinJar.archivePath).builtBy(legacyMixinJar)
+    embeddedMixin('org.spongepowered:mixin:0.8.5') { transitive = false }
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    compileOnly fg.deobf('curse.maven:baubles-227083:2518667')
+    if (compatProfile == 'baubles') runtimeOnly fg.deobf('curse.maven:baubles-227083:2518667')
+}
+mixin {
+    add sourceSets.main, 'inmis.refmap.json'
+    config 'inmis.mixins.json'
+}
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('mcmod.info') { expand version: project.version }
+}
+tasks.withType(JavaCompile) { options.encoding = 'UTF-8' }
+compileJava.options.incremental = false
+compileJava.doLast {
+    copy {
+        from file("$buildDir/tmp/compileJava/compileJava-refmap.json")
+        into sourceSets.main.output.resourcesDir
+        rename { 'inmis.refmap.json' }
+    }
+}
+jar {
+    dependsOn legacyMixinJar
+    from { zipTree(legacyMixinJar.archivePath) }
+    exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA', 'module-info.class'
+    manifest { attributes 'FMLCorePlugin': 'draylar.inmis.bootstrap.InmisLoadingPlugin',
+            'FMLCorePluginContainsFMLMod': 'true', 'ForceLoadAsMod': 'true',
+            'TweakClass': 'org.spongepowered.asm.launch.MixinTweaker',
+            'TweakOrder': '0', 'MixinConfigs': 'inmis.mixins.json' }
+    from('LICENSE') { rename { "${it}_${project.archivesBaseName}" } }
+}
+jar.finalizedBy('reobfJar')
+task sourcesJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+    from('LICENSE') { rename { "${it}_${project.archivesBaseName}" } }
+}
+assemble.dependsOn sourcesJar
+task smokeTestsJar(type: Jar) {
+    dependsOn smokeTestClasses
+    classifier = 'native-tests'
+    from sourceSets.smokeTest.output
+}
+reobf { smokeTestsJar {} }
+reobfSmokeTestsJar.doFirst {
+    // SpecialSource's live hierarchy lookup needs our main subclasses as well as
+    // Minecraft when remapping calls from the separate native-test source set.
+    classpath = classpath + sourceSets.main.output
+}
+smokeTestsJar.finalizedBy reobfSmokeTestsJar
+tasks.withType(AbstractArchiveTask) {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+// Legacy FML scans a single directory for both classes and mod metadata.
+sourceSets.each {
+    def outputDir = file("$buildDir/sourceSets/${it.name}")
+    it.output.resourcesDir = outputDir
+    it.java.outputDir = outputDir
+}
+// MCP's old merge step injects its MergeTool annotation API into the mapped jar.
+// Use the upstream 1.12-compatible API first for development launches (#748).
+def configureLegacyClasspath = { JavaExec run ->
+    def nativeSideApi = configurations.runtimeClasspath.filter { it.name == 'mergetool-0.2.3.3-forge.jar' }
+    run.classpath = nativeSideApi + run.classpath
+}
+tasks.withType(JavaExec) { doFirst { configureLegacyClasspath(delegate) } }
+
+task exportLegacyRuntimeLaunch {
+    dependsOn 'prepareRunServer', 'prepareRunClient', 'prepareRunSmokeTestServer', 'prepareRuntimeServer', 'prepareRuntimeClient', 'smokeTestClasses'
+    doLast {
+        ['SmokeTestServer', 'RuntimeServer', 'RuntimeClient'].each { suffix ->
+            def run = tasks.getByName(suffix == 'SmokeTestServer' ? 'runSmokeTestServer' : suffix.uncapitalize())
+            def parent = tasks.getByName(suffix.endsWith('Server') ? 'runServer' : 'runClient')
+            if (!run.main) run.main = parent.main
+            run.classpath = parent.classpath + run.classpath
+            configureLegacyClasspath(run)
+            run.jvmArgs parent.jvmArgs
+            run.minHeapSize = '256m'
+            run.maxHeapSize = '1g'
+            def environment = new LinkedHashMap(parent.environment)
+            environment.putAll(run.environment)
+            def allowed = ['MOD_CLASSES', 'mainClass', 'MCP_TO_SRG', 'MCP_MAPPINGS', 'MC_VERSION', 'FORGE_VERSION', 'FORGE_GROUP', 'tweakClass', 'nativesDirectory', 'assetDirectory', 'assetIndex']
+            def javaExecutable = System.getProperty('os.name').toLowerCase().contains('windows') ? 'bin/java.exe' : 'bin/java'
+            def programArgs = new ArrayList(parent.args)
+            // A child may inherit all parent arguments or replace them entirely.
+            // Preserve flag/value pairs; deduplicating individual tokens corrupts them.
+            if (run.args != parent.args) programArgs.addAll(run.args)
+            def launch = [java: new File(System.getProperty('java.home'), javaExecutable).absolutePath,
+                    workingDirectory: run.workingDir.absolutePath, classpath: run.classpath.asPath,
+                    mainClass: run.main ?: parent.main, jvmArgs: run.allJvmArgs.takeWhile { it != '-cp' && it != '-classpath' },
+                    args: programArgs, environment: environment.findAll { key, value -> allowed.contains(key) }]
+            def target = file("build/runtime/${suffix}-launch.json")
+            target.parentFile.mkdirs()
+            target.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(launch))
+        }
+    }
+}

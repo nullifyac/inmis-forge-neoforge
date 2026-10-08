@@ -1,0 +1,146 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.gtnewhorizons.retrofuturagradle' version '1.4.9'
+}
+
+group = project.maven_group
+version = "${project.fabric_version}-${project.mod_version}-${project.minecraft_version}"
+base { archivesName = project.archives_base_name }
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(8)
+    withSourcesJar()
+}
+
+minecraft {
+    mcVersion.set(project.minecraft_version)
+    username.set('InmisDev')
+    userUUID.set('00000000-0000-0000-0000-000000000001')
+    extraRunJvmArguments.addAll('-Xmx2G', '-ea:draylar.inmis')
+    injectedTags.put('VERSION', project.version)
+}
+tasks.injectTags.configure { outputClassName.set('draylar.inmis.Tags') }
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://nexus.gtnewhorizons.com/repository/public/' }
+    maven { url = 'https://www.cursemaven.com' }
+}
+
+def compatibilityProfile = providers.gradleProperty('compatProfile').getOrElse('none')
+if (!(compatibilityProfile in ['none', 'baubles'])) throw new GradleException('compatProfile must be none or baubles')
+dependencies {
+    compileOnly(rfg.deobf('curse.maven:baubles-227083:2224857'))
+    if (compatibilityProfile == 'baubles') runtimeOnly(rfg.deobf('curse.maven:baubles-227083:2224857'))
+}
+
+sourceSets {
+    smokeTest {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+configurations.smokeTestImplementation.extendsFrom configurations.implementation
+configurations.smokeTestRuntimeOnly.extendsFrom configurations.runtimeOnly
+
+def nativeRunClass = com.gtnewhorizons.retrofuturagradle.minecraft.RunMinecraftTask
+def nativeArguments = { String parent, File work ->
+    def inherited = tasks.named(parent).get().calculateArgs().toList()
+    if (parent != 'runClient') return inherited
+    def isolated = []
+    for (int i = 0; i < inherited.size(); i++) {
+        if (inherited[i] in ['--gameDir', '--width', '--height']) { i++; continue }
+        isolated.add(inherited[i])
+    }
+    isolated.addAll(['--gameDir', work.absolutePath, '--width', '1280', '--height', '720'])
+    return isolated
+}
+def createNativeRun = { String name, String parent, String folder, Map<String,Object> properties ->
+    def nativeWork = file(folder)
+    tasks.register(name, JavaExec) {
+        dependsOn tasks.named('jar'), tasks.named('smokeTestClasses'), tasks.named('packageMcLauncher'), tasks.named('packagePatchedMc')
+        if (parent == 'runClient') dependsOn tasks.named('downloadVanillaAssets'), tasks.named('extractNatives2')
+        javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(8) }
+        workingDir = nativeWork
+        systemProperties tasks.named(parent).get().systemProperties + properties + ['inmis.compatProfile': compatibilityProfile]
+        mainClass.set(tasks.named(parent).flatMap { it.mainClass })
+        classpath = files(providers.provider { (tasks.named(parent).get().classpath + sourceSets.smokeTest.runtimeClasspath).filter { !sourceSets.main.output.files.contains(it) } })
+        jvmArgumentProviders.add({ -> tasks.named(parent).get().calculateJvmArgs().collect { it.startsWith('-Xmx') && parent == 'runServer' ? '-Xmx1G' : it } } as CommandLineArgumentProvider)
+        argumentProviders.add({ -> nativeArguments(parent, nativeWork) } as CommandLineArgumentProvider)
+        doFirst {
+            workingDir.mkdirs()
+        }
+    }
+}
+createNativeRun('runSmokeTestServer', 'runServer', "build/smokeTest/${compatibilityProfile}", ['inmis.serverChecks': true])
+createNativeRun('runRuntimeServer', 'runServer', 'build/runtime/server', ['inmis.smokeServer': true])
+createNativeRun('runRuntimeClient', 'runClient', 'build/runtime/client', ['inmis.smokeClient': true])
+
+tasks.register('exportLegacyRuntimeLaunch') {
+    dependsOn tasks.named('jar'), tasks.named('smokeTestClasses'), tasks.named('packageMcLauncher'), tasks.named('packagePatchedMc')
+    dependsOn tasks.named('downloadVanillaAssets'), tasks.named('extractNatives2')
+    doLast {
+        ['SmokeTestServer','RuntimeServer','RuntimeClient'].each { launchKind ->
+        def parent = tasks.named(launchKind == 'RuntimeClient' ? 'runClient' : 'runServer').get()
+        def testRun = tasks.named('run' + launchKind).get()
+        def work = testRun.workingDir
+        work.mkdirs()
+        def extraProps = (parent.systemProperties + testRun.systemProperties).collect { key, value -> "-D${key}=${value}" }
+        def launch = [
+                java: javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(8) }.get().executablePath.asFile.absolutePath,
+                workingDirectory: work.absolutePath,
+                classpath: (parent.classpath + sourceSets.smokeTest.runtimeClasspath).filter { !sourceSets.main.output.files.contains(it) }.asPath,
+                mainClass: parent.mainClass.get(),
+                jvmArgs: parent.calculateJvmArgs().collect { it.startsWith('-Xmx') && launchKind != 'RuntimeClient' ? '-Xmx1G' : it } + extraProps,
+                args: nativeArguments(launchKind == 'RuntimeClient' ? 'runClient' : 'runServer', work),
+                environment: [:]
+        ]
+        def output = file("build/runtime/${launchKind}-launch.json")
+        output.parentFile.mkdirs()
+        output.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(launch))
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('mcmod.info') { expand(modVersion: project.version) }
+}
+jar {
+    from('LICENSE') { rename { 'LICENSE_inmis' } }
+    manifest { attributes 'FMLCorePlugin': 'draylar.inmis.core.InmisLoadingPlugin', 'FMLCorePluginContainsFMLMod': 'true' }
+}
+sourcesJar { from('LICENSE') { rename { 'LICENSE_inmis' } } }
+assemble.dependsOn tasks.named('reobfJar')
+
+tasks.register('smokeTestJar', Jar) {
+    dependsOn tasks.named('smokeTestClasses')
+    archiveClassifier = 'native-tests-dev'
+    from sourceSets.smokeTest.output
+}
+tasks.register('reobfSmokeTestJar', com.gtnewhorizons.retrofuturagradle.mcp.ReobfuscatedJar) {
+    dependsOn tasks.named('smokeTestJar'), tasks.named('reobfJar')
+    inputJar.set(tasks.named('smokeTestJar', Jar).flatMap { it.archiveFile })
+    archiveClassifier = 'native-tests'
+    def mainRemap = tasks.named('reobfJar').get()
+    mcVersion.set(mainRemap.mcVersion)
+    srg.set(mainRemap.srg)
+    fieldCsv.set(mainRemap.fieldCsv)
+    methodCsv.set(mainRemap.methodCsv)
+    exceptorCfg.set(mainRemap.exceptorCfg)
+    recompMcJar.set(mainRemap.recompMcJar)
+    referenceClasspath.from(mainRemap.referenceClasspath)
+    // Test bytecode calls inherited Minecraft members through our own subclasses.
+    // Their development classes must be available to resolve those owner mappings.
+    referenceClasspath.from(sourceSets.main.output)
+}
+
+publishing {
+    publications { mavenJava(MavenPublication) { from components.java } }
+}

@@ -1,0 +1,28 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "draylar.inmis.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "refmap": "inmis.refmap.json",
+  "mixins": [
+    "AbstractArrowMixin",
+    "AbstractArrowAccessor",
+    "AbstractContainerMenuAccessor",
+    "BlockItemMixin",
+    "BowItemMixin",
+    "HopperBlockEntityMixin",
+    "InventoryMenuMixin",
+    "ItemEntityMixin",
+    "LevelMixin",
+    "LivingEntityMixin",
+    "PlayerInventoryScreenMixin",
+    "PlayerMixin",
+    "RecipeManagerMixin",
+    "ShapedRecipeMixin",
+    "BaublesDeathMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "plugin": "draylar.inmis.bootstrap.InmisMixinPlugin"
+}

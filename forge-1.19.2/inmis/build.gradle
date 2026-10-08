@@ -27,13 +27,38 @@ sourceSets {
 
 configurations {
     gameTestImplementation.extendsFrom implementation
+    gameTestCompileOnly.extendsFrom compileOnly
     gameTestRuntimeOnly.extendsFrom runtimeOnly
 }
+
+def compatProfile = (project.findProperty('compatProfile') ?: 'curios').toString()
+if (!(compatProfile in ['none', 'curios'])) throw new GradleException('compatProfile must be none or curios')
 
 minecraft {
     mappings channel: 'official', version: project.minecraft_version
 
     runs {
+        runtimeServer {
+            workingDirectory project.file('build/runtime/server')
+            property 'forge.logging.console.level', 'info'
+            property 'inmis.smokeServer', 'true'
+            jvmArgs '-Xms512m', '-Xmx2g'
+            mods {
+                inmis { source sourceSets.main }
+                inmis_game_tests { source sourceSets.gameTest }
+            }
+        }
+        runtimeClient {
+            workingDirectory project.file('build/runtime/client')
+            property 'forge.logging.console.level', 'info'
+            property 'inmis.smokeClient', 'true'
+            jvmArgs '-Xms512m', '-Xmx2g'
+            args '--username', 'Dev', '--width', '1280', '--height', '720'
+            mods {
+                inmis { source sourceSets.main }
+                inmis_game_tests { source sourceSets.gameTest }
+            }
+        }
         gameTestServer {
             forceExit false
             workingDirectory project.file('build/gameTest')
@@ -90,7 +115,8 @@ minecraft {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
-    implementation fg.deobf("top.theillusivec4.curios:curios-forge:${project.curios_version}")
+    compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${project.curios_version}")
+    if (compatProfile == 'curios') runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:${project.curios_version}")
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
 }
 

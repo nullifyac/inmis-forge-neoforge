@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Runs native Inmis GameTests and an isolated NeoForge client/server smoke test.
+Runs native Inmis GameTests and isolated Forge/NeoForge client/server smoke tests.
 .EXAMPLE
 .\scripts\verify-runtime.ps1
 .EXAMPLE
@@ -335,7 +335,7 @@ function Invoke-SmokePhase([string]$Version, [string]$Profile, [string]$Phase, [
         New-IsolatedDirectory $logDirectory $reportRoot | Out-Null
         Copy-Item -LiteralPath (Join-Path $serverDirectory 'config/inmis.json') -Destination (Join-Path $logDirectory 'server-inmis.json')
         Copy-Item -LiteralPath (Join-Path $clientDirectory 'config/inmis.json') -Destination (Join-Path $logDirectory 'client-inmis.json')
-        Write-Host "Starting native NeoForge smoke $Profile/$Phase."
+        Write-Host "Starting native $Version smoke $Profile/$Phase."
         $serverProcess = Start-OwnedHelper $runtimeLauncher @('-LaunchFile', (Join-Path $RuntimeRoot 'RuntimeServer-launch.json')) $logDirectory 'server'
         Wait-ServerReady $serverProcess (Join-Path $logDirectory 'server-stdout.log')
         $clientProcess = Start-OwnedHelper $runtimeLauncher @('-LaunchFile', (Join-Path $RuntimeRoot 'RuntimeClient-launch.json')) $logDirectory 'client'
@@ -377,7 +377,7 @@ function Invoke-SmokePhase([string]$Version, [string]$Profile, [string]$Phase, [
         }
         Copy-Item -LiteralPath $screenshot -Destination (Join-Path $logDirectory "inmis-$Phase-menu.png") -Force
         $settingsScreenshot = Join-Path $clientDirectory "screenshots/inmis-$Phase-settings.png"
-        if ($Version -eq 'neoforge-26.1.2') {
+        if ($Version -eq 'neoforge-26.1.2' -or $Version.StartsWith('forge-')) {
             if (-not (Test-Path -LiteralPath $settingsScreenshot -PathType Leaf) -or
                     (Get-Item -LiteralPath $settingsScreenshot).LastWriteTimeUtc -lt $phaseStartedUtc.AddSeconds(-1)) {
                 throw 'Upgrades panel screenshot was not written during this phase.'
@@ -435,7 +435,7 @@ try {
 } finally { Pop-Location }
 '@
     Write-IsolatedText $gradleWorker $workerContent $reportRoot
-    $needsJava17 = -not $SkipGameTests -and @($Versions | Where-Object { $_.StartsWith('forge-') }).Count -gt 0
+    $needsJava17 = (-not $SkipGameTests -or -not $SkipClient) -and @($Versions | Where-Object { $_.StartsWith('forge-') }).Count -gt 0
     $needsJava21 = $Versions -contains 'neoforge-1.21.1' -and (-not $SkipGameTests -or -not $SkipClient)
     $needsJava25 = $Versions -contains 'neoforge-26.1.2' -and (-not $SkipGameTests -or -not $SkipClient)
     $jdk25 = if ($needsJava25) { Find-Jdk 25 $Java25Home } else { $null }
@@ -452,9 +452,9 @@ try {
         }
     }
     if (-not $SkipClient) {
-      foreach ($neoVersion in @($Versions | Where-Object { $_.StartsWith('neoforge') })) {
-        $targetJdk = if ($neoVersion -eq 'neoforge-26.1.2') { $jdk25 } else { $jdk21 }
-        $supportedClientProfiles = @(if ($neoVersion -eq 'neoforge-26.1.2') { @($ClientProfiles | Where-Object { $_ -in @('none', 'curios') }) } else { $ClientProfiles })
+      foreach ($neoVersion in $Versions) {
+        $targetJdk = if ($neoVersion.StartsWith('forge-')) { $jdk17 } elseif ($neoVersion -eq 'neoforge-26.1.2') { $jdk25 } else { $jdk21 }
+        $supportedClientProfiles = @(if ($neoVersion -eq 'neoforge-26.1.2' -or $neoVersion.StartsWith('forge-')) { @($ClientProfiles | Where-Object { $_ -in @('none', 'curios') }) } else { $ClientProfiles })
         if ($supportedClientProfiles.Count -eq 0) { throw "No supported client profiles were selected for $neoVersion." }
         $neoProject = Join-Path $repositoryRoot "$neoVersion/inmis"
         $runtimeRoot = New-IsolatedDirectory (Join-Path $neoProject 'build/runtime') (Join-Path $neoProject 'build')

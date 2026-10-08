@@ -1,0 +1,11 @@
+[
+  {
+    "modid": "inmis_smoke_tests",
+    "name": "Inmis Native Checks",
+    "version": "1",
+    "mcversion": "1.12.2",
+    "dependencies": [
+      "inmis"
+    ]
+  }
+]

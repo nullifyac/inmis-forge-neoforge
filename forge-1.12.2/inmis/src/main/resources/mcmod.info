@@ -1,0 +1,15 @@
+[
+  {
+    "modid": "inmis",
+    "name": "Inmis",
+    "description": "Configurable backpacks with upgrades and optional Baubles support.",
+    "version": "${version}",
+    "mcversion": "1.12.2",
+    "url": "https://www.curseforge.com/minecraft/mc-mods/inmis-forge-port",
+    "authorList": [
+      "Draylar",
+      "nullifyac"
+    ],
+    "dependencies": []
+  }
+]

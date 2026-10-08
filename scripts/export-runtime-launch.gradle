@@ -1,22 +1,80 @@
-// Export ModDevGradle's complete launch settings so an isolated client and
+// Export the loader plugin's complete launch settings so an isolated client and
 // server can run together without retaining two Gradle daemons.
 import groovy.json.JsonOutput
 
 gradle.projectsEvaluated {
     rootProject.tasks.register('exportRuntimeLaunch') {
-        dependsOn 'prepareRuntimeServerRun', 'prepareRuntimeClientRun', 'gameTestClasses'
+        def forge = rootProject.plugins.hasPlugin('net.minecraftforge.gradle')
+        if (forge) {
+            dependsOn 'prepareRunServer', 'prepareRunClient', 'prepareRuntimeServer', 'prepareRuntimeClient', 'gameTestClasses'
+        } else {
+            dependsOn 'prepareRuntimeServerRun', 'prepareRuntimeClientRun', 'gameTestClasses'
+        }
         doLast {
             ['RuntimeServer', 'RuntimeClient'].each { suffix ->
-                def run = rootProject.tasks.getByName('run' + suffix)
-                def launch = [
-                    java: run.javaLauncher.get().executablePath.asFile.absolutePath,
-                    workingDirectory: run.gameDirectory.get().asFile.absolutePath,
-                    classpath: run.classpathProvider.asPath,
-                    mainClass: run.mainClass.get(),
-                    jvmArgs: run.jvmArgs + run.jvmArgumentProviders.collectMany { it.asArguments().toList() },
-                    args: run.args + run.argumentProviders.collectMany { it.asArguments().toList() },
-                    environment: run.environmentProperty.get()
-                ]
+                def launch
+                if (forge) {
+                    def run = rootProject.tasks.getByName(suffix.uncapitalize())
+                    def parent = rootProject.tasks.getByName(suffix.endsWith('Server') ? 'runServer' : 'runClient')
+                    def environment = new LinkedHashMap(parent.environment)
+                    environment.putAll(run.environment)
+                    def launcher = rootProject.javaToolchains.launcherFor {
+                        languageVersion = JavaLanguageVersion.of(17)
+                    }.get()
+                    if (run.hasProperty('runConfig')) {
+                        // ForgeGradle 6 initializes JavaExec settings inside exec().
+                        // Resolve the same run configuration without starting Minecraft.
+                        def config = run.runConfig.get()
+                        config.merge(parent.runConfig.get(), false)
+                        def generator = rootProject.plugins.findPlugin('net.minecraftforge.gradle').class.classLoader
+                                .loadClass('net.minecraftforge.gradle.common.util.runs.RunConfigGenerator')
+                        def tokens = generator.configureTokensLazy(rootProject, config,
+                                generator.mapModClassesToGradle(rootProject, config),
+                                run.minecraftArtifacts, run.runtimeClasspathArtifacts)
+                        def resolve = { value -> config.replace(tokens, value.toString()) }
+                        def vmArguments = config.jvmArgs.collect(resolve)
+                        if (config.isClient()) vmArguments.addAll(run.additionalClientArgs.get().collect(resolve))
+                        config.properties.each { key, value -> vmArguments.add('-D' + key + '=' + resolve(value)) }
+                        def classpath = rootProject.files(config.allSources.collect { it.runtimeClasspath })
+                        launch = [
+                            java: launcher.executablePath.asFile.absolutePath,
+                            workingDirectory: config.workingDirectory,
+                            classpath: classpath.asPath,
+                            mainClass: config.main,
+                            jvmArgs: vmArguments,
+                            args: generator.getArgsStream(config, tokens, false).toArray().toList(),
+                            environment: config.environment.collectEntries { key, value -> [(key): resolve(value)] }
+                        ]
+                    } else {
+                        launch = [
+                            java: launcher.executablePath.asFile.absolutePath,
+                            workingDirectory: run.workingDir.absolutePath,
+                            classpath: run.classpath.asPath,
+                            mainClass: run.mainClass.orNull ?: parent.mainClass.orNull,
+                            // Preserve repeated option/value pairs such as --add-exports.
+                            jvmArgs: (parent.allJvmArgs + run.allJvmArgs).collect { argument ->
+                                def value = argument.toString()
+                                value.startsWith('"') && value.endsWith('"') ? value.substring(1, value.length() - 1) : value
+                            },
+                            args: parent.args + run.args,
+                            environment: environment.findAll { key, value ->
+                                ['MOD_CLASSES', 'target', 'MCP_VERSION', 'MC_VERSION', 'FORGE_GROUP', 'FORGE_VERSION',
+                                 'nativesDirectory', 'assetDirectory', 'assetIndex'].contains(key)
+                            }
+                        ]
+                    }
+                } else {
+                    def run = rootProject.tasks.getByName('run' + suffix)
+                    launch = [
+                        java: run.javaLauncher.get().executablePath.asFile.absolutePath,
+                        workingDirectory: run.gameDirectory.get().asFile.absolutePath,
+                        classpath: run.classpathProvider.asPath,
+                        mainClass: run.mainClass.get(),
+                        jvmArgs: run.jvmArgs + run.jvmArgumentProviders.collectMany { it.asArguments().toList() },
+                        args: run.args + run.argumentProviders.collectMany { it.asArguments().toList() },
+                        environment: run.environmentProperty.get()
+                    ]
+                }
                 def target = rootProject.layout.buildDirectory.file('runtime/' + suffix + '-launch.json').get().asFile
                 target.parentFile.mkdirs()
                 target.text = JsonOutput.prettyPrint(JsonOutput.toJson(launch))

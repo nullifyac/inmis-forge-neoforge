@@ -1,0 +1,13 @@
+[
+  {
+    "modid": "inmis",
+    "name": "Inmis",
+    "description": "Expandable backpacks with configurable tiers and augments.",
+    "version": "${modVersion}",
+    "mcversion": "1.7.10",
+    "url": "https://github.com/nullifyac/inmis-forge-neoforge",
+    "authorList": ["Draylar", "nullifyac"],
+    "credits": "Original Fabric mod by Draylar",
+    "logoFile": "assets/inmis/icon.png"
+  }
+]
