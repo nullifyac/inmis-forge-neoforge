@@ -7,14 +7,16 @@ Runs native Inmis GameTests and an isolated NeoForge client/server smoke test.
 .\scripts\verify-runtime.ps1 -Versions neoforge-1.21.1 -ClientProfiles none,curios,accessories,both
 .EXAMPLE
 .\scripts\verify-runtime.ps1 -SkipClient
+.EXAMPLE
+.\scripts\verify-runtime.ps1 -Versions neoforge-26.1.2 -NeoProfiles none,curios -ClientProfiles none,curios
 .NOTES
 Run after source edits are complete. Existing Prism instances and worlds are
 never accessed. Logs, results, screenshots and reports go to temp/runtime-validation.
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('forge-1.18.2', 'forge-1.19.2', 'forge-1.20.1', 'neoforge-1.21.1')]
-    [string[]]$Versions = @('forge-1.18.2', 'forge-1.19.2', 'forge-1.20.1', 'neoforge-1.21.1'),
+    [ValidateSet('forge-1.18.2', 'forge-1.19.2', 'forge-1.20.1', 'neoforge-1.21.1', 'neoforge-26.1.2')]
+    [string[]]$Versions = @('forge-1.18.2', 'forge-1.19.2', 'forge-1.20.1', 'neoforge-1.21.1', 'neoforge-26.1.2'),
     [ValidateSet('none', 'curios', 'accessories', 'both')]
     [string[]]$NeoProfiles = @('none', 'curios', 'accessories', 'both'),
     [ValidateSet('none', 'curios', 'accessories', 'both')]
@@ -23,6 +25,7 @@ param(
     [switch]$SkipGameTests,
     [string]$Java17Home = $env:JAVA17_HOME,
     [string]$Java21Home = $env:JAVA21_HOME,
+    [string]$Java25Home = $env:JAVA25_HOME,
     [ValidateRange(60, 7200)][int]$GradleTimeoutSeconds = 1200,
     [ValidateRange(30, 1800)][int]$ServerStartupTimeoutSeconds = 240,
     [ValidateRange(60, 1800)][int]$ClientTimeoutSeconds = 480
@@ -75,7 +78,7 @@ function Find-Jdk([int]$Major, [string]$ExplicitPath) {
         if ($env:JAVA_HOME) { $candidates += $env:JAVA_HOME }
         $javaCommand = Get-Command java -ErrorAction SilentlyContinue
         if ($javaCommand) { $candidates += Split-Path (Split-Path $javaCommand.Source) }
-        foreach ($installationRoot in @((Join-Path $env:ProgramFiles 'Eclipse Adoptium'), (Join-Path $env:ProgramFiles 'Java'))) {
+        foreach ($installationRoot in @((Join-Path $env:ProgramFiles 'Eclipse Adoptium'), (Join-Path $env:ProgramFiles 'Java'), (Join-Path $env:USERPROFILE '.jdks'))) {
             if (Test-Path -LiteralPath $installationRoot) {
                 $candidates += Get-ChildItem -LiteralPath $installationRoot -Directory | Select-Object -ExpandProperty FullName
             }
@@ -199,11 +202,13 @@ function Invoke-IsolatedGradle([string]$ProjectPath, [string]$JdkPath, [string[]
     # --no-daemon stops the single-use Gradle JVM when this invocation exits;
     # no Gradle JVM is retained while the two exported game processes run.
 }
-function Copy-RuntimeReports([string]$RuntimeDirectory, [string]$Destination) {
+function Copy-RuntimeReports([string]$RuntimeDirectory, [string]$Destination, [datetime]$SinceUtc = [datetime]::MinValue) {
     New-IsolatedDirectory $Destination $reportRoot | Out-Null
-    foreach ($relative in @('logs/latest.log', 'logs/debug.log', 'server.properties')) {
+    $earliestUtc = if ($SinceUtc -eq [datetime]::MinValue) { $SinceUtc } else { $SinceUtc.AddSeconds(-1) }
+    foreach ($relative in @('logs/latest.log', 'logs/debug.log', 'server.properties', 'renderer-request.txt')) {
         $source = Join-Path $RuntimeDirectory $relative
-        if (Test-Path -LiteralPath $source -PathType Leaf) {
+        if ((Test-Path -LiteralPath $source -PathType Leaf) -and
+                (Get-Item -LiteralPath $source).LastWriteTimeUtc -ge $earliestUtc) {
             $target = Join-Path $Destination $relative
             New-IsolatedDirectory (Split-Path -Path $target -Parent) $reportRoot | Out-Null
             Copy-Item -LiteralPath $source -Destination $target -Force
@@ -211,6 +216,7 @@ function Copy-RuntimeReports([string]$RuntimeDirectory, [string]$Destination) {
     }
     if (Test-Path -LiteralPath $RuntimeDirectory -PathType Container) {
         foreach ($file in @(Get-ChildItem -LiteralPath $RuntimeDirectory -File -Recurse -Filter '*.xml')) {
+            if ($file.LastWriteTimeUtc -lt $earliestUtc) { continue }
             $relative = $file.FullName.Substring($RuntimeDirectory.TrimEnd('\').Length).TrimStart('\')
             $target = Assert-ContainedPath (Join-Path $Destination $relative) $reportRoot
             New-IsolatedDirectory (Split-Path -Path $target -Parent) $reportRoot | Out-Null
@@ -219,6 +225,7 @@ function Copy-RuntimeReports([string]$RuntimeDirectory, [string]$Destination) {
         $crashDirectory = Join-Path $RuntimeDirectory 'crash-reports'
         if (Test-Path -LiteralPath $crashDirectory -PathType Container) {
             foreach ($file in @(Get-ChildItem -LiteralPath $crashDirectory -File -Filter '*.txt')) {
+                if ($file.LastWriteTimeUtc -lt $earliestUtc) { continue }
                 $targetDirectory = New-IsolatedDirectory (Join-Path $Destination 'crash-reports') $reportRoot
                 Copy-Item -LiteralPath $file.FullName -Destination $targetDirectory -Force
             }
@@ -232,6 +239,7 @@ function Invoke-GameTests([string]$Version, [string]$Profile, [string]$JdkPath) 
         Join-Path $projectPath 'build/gameTest'
     }
     $name = "$Version-$Profile-gametest"
+    $gameTestStartedUtc = [DateTime]::UtcNow
     try {
         New-IsolatedDirectory $runtimeDirectory (Join-Path $projectPath 'build') | Out-Null
         $arguments = @('runGameTestServer')
@@ -245,11 +253,18 @@ function Invoke-GameTests([string]$Version, [string]$Profile, [string]$JdkPath) 
             throw 'GameTest process exited without a nonempty required-test success summary.'
         }
         if ($log -match '[1-9][0-9]* required tests failed') { throw 'GameTest output contains required test failures.' }
+        if ($Version -eq 'neoforge-26.1.2') {
+            # The target also runs vanilla's always_pass; that alone cannot validate Inmis.
+            $minimumTests = 33
+            if ($testCount -lt $minimumTests) {
+                throw "Expected at least $minimumTests native tests including Inmis, but only $testCount ran."
+            }
+        }
         Add-Check $name 'PASS' 'Required GameTests passed in the native game runtime.' $logDirectory $testCount
     } catch {
         Add-Check $name 'FAIL' $_.Exception.Message $logDirectory
     } finally {
-        Copy-RuntimeReports $runtimeDirectory (Join-Path $logDirectory 'runtime-reports')
+        Copy-RuntimeReports $runtimeDirectory (Join-Path $logDirectory 'runtime-reports') $gameTestStartedUtc
     }
 }
 function Get-SmokeConfiguration([int]$WitheredWidth, [int]$WitheredRows) {
@@ -284,7 +299,7 @@ function Assert-LoopbackPortAvailable {
 }
 function Clear-ExactResult([string]$Path, [string]$RuntimeRoot) {
     $target = Assert-ContainedPath $Path $RuntimeRoot
-    if ([IO.Path]::GetFileName($target) -notmatch '^(?:result|server-result)-(?:write|read)\.txt$') {
+    if ([IO.Path]::GetFileName($target) -notmatch '^(?:(?:result|server-result)-(?:write|read)|renderer-request)\.txt$') {
         throw "Refusing to remove an unrecognized verification result file: $target"
     }
     if (Test-Path -LiteralPath $target -PathType Leaf) { Remove-Item -LiteralPath $target -Force }
@@ -298,10 +313,10 @@ function Wait-ServerReady([Diagnostics.Process]$Process, [string]$OutputPath) {
     }
     throw "Smoke server did not become ready within $ServerStartupTimeoutSeconds seconds."
 }
-function Invoke-SmokePhase([string]$Profile, [string]$Phase, [string]$RuntimeRoot) {
+function Invoke-SmokePhase([string]$Version, [string]$Profile, [string]$Phase, [string]$RuntimeRoot) {
     $serverDirectory = Join-Path $RuntimeRoot 'server'
     $clientDirectory = Join-Path $RuntimeRoot 'client'
-    $logDirectory = Join-Path $reportRoot "neoforge-1.21.1/$Profile/$Phase"
+    $logDirectory = Join-Path $reportRoot "$Version/$Profile/$Phase"
     $clientResult = Join-Path $clientDirectory "result-$Phase.txt"
     $serverResult = Join-Path $serverDirectory "server-result-$Phase.txt"
     $serverProcess = $null
@@ -312,6 +327,7 @@ function Invoke-SmokePhase([string]$Profile, [string]$Phase, [string]$RuntimeRoo
         Assert-LoopbackPortAvailable
         Clear-ExactResult $clientResult $RuntimeRoot
         Clear-ExactResult $serverResult $RuntimeRoot
+        Clear-ExactResult (Join-Path $serverDirectory 'renderer-request.txt') $RuntimeRoot
         Write-IsolatedText (Join-Path $serverDirectory 'phase.txt') $Phase $RuntimeRoot
         $serverRows = if ($Phase -eq 'write') { 6 } else { 3 }
         Write-IsolatedText (Join-Path $serverDirectory 'config/inmis.json') (Get-SmokeConfiguration 9 $serverRows) $RuntimeRoot
@@ -360,10 +376,28 @@ function Invoke-SmokePhase([string]$Profile, [string]$Phase, [string]$RuntimeRoo
             throw 'Client verification screenshot was not written during this phase.'
         }
         Copy-Item -LiteralPath $screenshot -Destination (Join-Path $logDirectory "inmis-$Phase-menu.png") -Force
-        Add-Check "neoforge-1.21.1-$Profile-$Phase" 'PASS' $serverText $logDirectory
+        $settingsScreenshot = Join-Path $clientDirectory "screenshots/inmis-$Phase-settings.png"
+        if ($Version -eq 'neoforge-26.1.2') {
+            if (-not (Test-Path -LiteralPath $settingsScreenshot -PathType Leaf) -or
+                    (Get-Item -LiteralPath $settingsScreenshot).LastWriteTimeUtc -lt $phaseStartedUtc.AddSeconds(-1)) {
+                throw 'Upgrades panel screenshot was not written during this phase.'
+            }
+            Copy-Item -LiteralPath $settingsScreenshot -Destination $logDirectory -Force
+            $renderKinds = @('chest-render')
+            if ($Profile -eq 'curios') { $renderKinds += 'curios-render' }
+            foreach ($renderKind in $renderKinds) {
+                $renderScreenshot = Join-Path $clientDirectory "screenshots/inmis-$Phase-$renderKind.png"
+                if (-not (Test-Path -LiteralPath $renderScreenshot -PathType Leaf) -or
+                        (Get-Item -LiteralPath $renderScreenshot).LastWriteTimeUtc -lt $phaseStartedUtc.AddSeconds(-1)) {
+                    throw "Backpack $renderKind screenshot was not written during this phase."
+                }
+                Copy-Item -LiteralPath $renderScreenshot -Destination $logDirectory -Force
+            }
+        }
+        Add-Check "$Version-$Profile-$Phase" 'PASS' $serverText $logDirectory
         $passed = $true
     } catch {
-        Add-Check "neoforge-1.21.1-$Profile-$Phase" 'FAIL' $_.Exception.Message $logDirectory
+        Add-Check "$Version-$Profile-$Phase" 'FAIL' $_.Exception.Message $logDirectory
     } finally {
         Stop-OwnedProcessTree $clientProcess
         Stop-OwnedProcessTree $serverProcess
@@ -371,8 +405,8 @@ function Invoke-SmokePhase([string]$Profile, [string]$Phase, [string]$RuntimeRoo
         foreach ($resultPath in @($clientResult, $serverResult)) {
             if (Test-Path -LiteralPath $resultPath -PathType Leaf) { Copy-Item -LiteralPath $resultPath -Destination $logDirectory -Force }
         }
-        Copy-RuntimeReports $serverDirectory (Join-Path $logDirectory 'server-runtime')
-        Copy-RuntimeReports $clientDirectory (Join-Path $logDirectory 'client-runtime')
+        Copy-RuntimeReports $serverDirectory (Join-Path $logDirectory 'server-runtime') $phaseStartedUtc
+        Copy-RuntimeReports $clientDirectory (Join-Path $logDirectory 'client-runtime') $phaseStartedUtc
     }
     return $passed
 }
@@ -403,30 +437,39 @@ try {
     Write-IsolatedText $gradleWorker $workerContent $reportRoot
     $needsJava17 = -not $SkipGameTests -and @($Versions | Where-Object { $_.StartsWith('forge-') }).Count -gt 0
     $needsJava21 = $Versions -contains 'neoforge-1.21.1' -and (-not $SkipGameTests -or -not $SkipClient)
+    $needsJava25 = $Versions -contains 'neoforge-26.1.2' -and (-not $SkipGameTests -or -not $SkipClient)
+    $jdk25 = if ($needsJava25) { Find-Jdk 25 $Java25Home } else { $null }
     $jdk17 = if ($needsJava17) { Find-Jdk 17 $Java17Home } else { $null }
     $jdk21 = if ($needsJava21) { Find-Jdk 21 $Java21Home } else { $null }
     if (-not $SkipGameTests) {
         foreach ($version in $Versions) {
             if ($version.StartsWith('neoforge')) {
-                foreach ($profile in $NeoProfiles) { Invoke-GameTests $version $profile $jdk21 }
+                $profiles = @(if ($version -eq 'neoforge-26.1.2') { @($NeoProfiles | Where-Object { $_ -in @('none', 'curios') }) } else { $NeoProfiles })
+                if ($profiles.Count -eq 0) { throw "No supported compatibility profiles were selected for $version." }
+                $targetJdk = if ($version -eq 'neoforge-26.1.2') { $jdk25 } else { $jdk21 }
+                foreach ($profile in $profiles) { Invoke-GameTests $version $profile $targetJdk }
             } else { Invoke-GameTests $version 'curios' $jdk17 }
         }
     }
-    if (-not $SkipClient -and $Versions -contains 'neoforge-1.21.1') {
-        $neoProject = Join-Path $repositoryRoot 'neoforge-1.21.1/inmis'
+    if (-not $SkipClient) {
+      foreach ($neoVersion in @($Versions | Where-Object { $_.StartsWith('neoforge') })) {
+        $targetJdk = if ($neoVersion -eq 'neoforge-26.1.2') { $jdk25 } else { $jdk21 }
+        $supportedClientProfiles = @(if ($neoVersion -eq 'neoforge-26.1.2') { @($ClientProfiles | Where-Object { $_ -in @('none', 'curios') }) } else { $ClientProfiles })
+        if ($supportedClientProfiles.Count -eq 0) { throw "No supported client profiles were selected for $neoVersion." }
+        $neoProject = Join-Path $repositoryRoot "$neoVersion/inmis"
         $runtimeRoot = New-IsolatedDirectory (Join-Path $neoProject 'build/runtime') (Join-Path $neoProject 'build')
         Assert-LoopbackPortAvailable
         New-IsolatedDirectory (Join-Path $runtimeRoot 'server') $runtimeRoot | Out-Null
         New-IsolatedDirectory (Join-Path $runtimeRoot 'client') $runtimeRoot | Out-Null
-        $clientOptions = @('fullscreen:false', 'guiScale:2', 'renderDistance:4', 'simulationDistance:5',
+        $clientOptions = @('fullscreen:false', 'pauseOnLostFocus:false', 'guiScale:2', 'renderDistance:4', 'simulationDistance:5',
                 'overrideWidth:1280', 'overrideHeight:720', 'tutorialStep:none', 'enableVsync:false', 'maxFps:30') -join [Environment]::NewLine
         Write-IsolatedText (Join-Path $runtimeRoot 'client/options.txt') $clientOptions $runtimeRoot
         # EULA acceptance is confined to this generated test server.
         Write-IsolatedText (Join-Path $runtimeRoot 'server/eula.txt') 'eula=true' $runtimeRoot
-        foreach ($profile in $ClientProfiles) {
-            $exportDirectory = Join-Path $reportRoot "neoforge-1.21.1/$profile/export"
+        foreach ($profile in $supportedClientProfiles) {
+            $exportDirectory = Join-Path $reportRoot "$neoVersion/$profile/export"
             try {
-                Invoke-IsolatedGradle $neoProject $jdk21 @('-I', (Join-Path $PSScriptRoot 'export-runtime-launch.gradle'),
+                Invoke-IsolatedGradle $neoProject $targetJdk @('-I', (Join-Path $PSScriptRoot 'export-runtime-launch.gradle'),
                         'exportRuntimeLaunch', "-PcompatProfile=$profile") $exportDirectory "export-$profile"
                 $serverLaunch = Get-Content -LiteralPath (Join-Path $runtimeRoot 'RuntimeServer-launch.json') -Raw | ConvertFrom-Json
                 $clientLaunch = Get-Content -LiteralPath (Join-Path $runtimeRoot 'RuntimeClient-launch.json') -Raw | ConvertFrom-Json
@@ -434,9 +477,9 @@ try {
                     [IO.Path]::GetFullPath($clientLaunch.workingDirectory) -ne (Join-Path $runtimeRoot 'client')) {
                     throw 'Exported launch working directories do not match the isolated runtime directories.'
                 }
-                Add-Check "neoforge-1.21.1-$profile-export" 'PASS' 'Launch exported; single-use Gradle JVM has stopped.' $exportDirectory
+                Add-Check "$neoVersion-$profile-export" 'PASS' 'Launch exported; single-use Gradle JVM has stopped.' $exportDirectory
             } catch {
-                Add-Check "neoforge-1.21.1-$profile-export" 'FAIL' $_.Exception.Message $exportDirectory
+                Add-Check "$neoVersion-$profile-export" 'FAIL' $_.Exception.Message $exportDirectory
                 continue
             }
             $worldName = "inmis-runtime-verification-$runId-$profile"
@@ -447,19 +490,20 @@ try {
                     'max-players=1', 'view-distance=4', 'simulation-distance=4', 'enable-rcon=false',
                     'enable-query=false', 'enforce-secure-profile=false', 'sync-chunk-writes=true') -join [Environment]::NewLine
             Write-IsolatedText (Join-Path $runtimeRoot 'server/server.properties') $serverProperties $runtimeRoot
-            if (Invoke-SmokePhase $profile 'write' $runtimeRoot) {
-                Invoke-SmokePhase $profile 'read' $runtimeRoot | Out-Null
+            if (Invoke-SmokePhase $neoVersion $profile 'write' $runtimeRoot) {
+                Invoke-SmokePhase $neoVersion $profile 'read' $runtimeRoot | Out-Null
             } else {
-                Add-Check "neoforge-1.21.1-$profile-read" 'SKIP' 'Write failed; no valid persisted fixture exists.' $exportDirectory
+                Add-Check "$neoVersion-$profile-read" 'SKIP' 'Write failed; no valid persisted fixture exists.' $exportDirectory
             }
             $playerDataDirectory = Join-Path $runtimeRoot "server/$worldName/playerdata"
             if (Test-Path -LiteralPath $playerDataDirectory -PathType Container) {
-                $savedDataDirectory = New-IsolatedDirectory (Join-Path $reportRoot "neoforge-1.21.1/$profile/playerdata") $reportRoot
+                $savedDataDirectory = New-IsolatedDirectory (Join-Path $reportRoot "$neoVersion/$profile/playerdata") $reportRoot
                 foreach ($file in @(Get-ChildItem -LiteralPath $playerDataDirectory -File -Filter '*.dat')) {
                     Copy-Item -LiteralPath $file.FullName -Destination $savedDataDirectory -Force
                 }
             }
         }
+      }
     }
     $completed = $true
 } finally {

@@ -1,0 +1,6 @@
+{
+    "model":  {
+                  "model":  "inmis:item/ender_pouch",
+                  "type":  "minecraft:model"
+              }
+}

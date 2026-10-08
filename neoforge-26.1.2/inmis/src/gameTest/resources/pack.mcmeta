@@ -1,0 +1,13 @@
+{
+    "pack":  {
+                 "max_format":  [
+                                    101,
+                                    1
+                                ],
+                 "min_format":  [
+                                    101,
+                                    1
+                                ],
+                 "description":  "Inmis development-only regression test structures"
+             }
+}

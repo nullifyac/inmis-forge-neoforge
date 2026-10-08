@@ -8,10 +8,11 @@ Uses the version declared in each project's gradle.properties. Existing build
 outputs are retained; only the exact expected playable JAR is staged.
 #>
 param(
-    [ValidateSet('forge-1.18.2', 'forge-1.19.2', 'forge-1.20.1', 'neoforge-1.21.1')]
-    [string[]]$Versions = @('neoforge-1.21.1', 'forge-1.20.1', 'forge-1.19.2', 'forge-1.18.2'),
+    [ValidateSet('forge-1.16.5', 'forge-1.18.2', 'forge-1.19.2', 'forge-1.20.1', 'neoforge-1.21.1', 'neoforge-26.1.2')]
+    [string[]]$Versions = @('neoforge-26.1.2', 'neoforge-1.21.1', 'forge-1.20.1', 'forge-1.19.2', 'forge-1.18.2', 'forge-1.16.5'),
     [string]$Java17Home = $env:JAVA17_HOME,
-    [string]$Java21Home = $env:JAVA21_HOME
+    [string]$Java21Home = $env:JAVA21_HOME,
+    [string]$Java25Home = $env:JAVA25_HOME
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -68,7 +69,7 @@ function Find-Jdk([int]$Major, [string]$ExplicitPath) {
         if ($env:JAVA_HOME) { $candidates += $env:JAVA_HOME }
         $javaCommand = Get-Command java -ErrorAction SilentlyContinue
         if ($javaCommand) { $candidates += Split-Path (Split-Path $javaCommand.Source) }
-        foreach ($installationRoot in @((Join-Path $env:ProgramFiles 'Eclipse Adoptium'), (Join-Path $env:ProgramFiles 'Java'))) {
+        foreach ($installationRoot in @((Join-Path $env:ProgramFiles 'Eclipse Adoptium'), (Join-Path $env:ProgramFiles 'Java'), (Join-Path $env:USERPROFILE '.jdks'))) {
             if (Test-Path -LiteralPath $installationRoot) {
                 $candidates += Get-ChildItem -LiteralPath $installationRoot -Directory | Select-Object -ExpandProperty FullName
             }
@@ -122,7 +123,9 @@ function Test-ReleaseMetadata([string]$Text, [hashtable]$Properties, [bool]$NeoF
     if ($minecraft.Count -ne 1 -or (Read-TomlString $minecraft[0].Groups[2].Value 'versionRange') -ne $expectedRange) {
         throw "Packaged Minecraft dependency must be exactly $expectedRange."
     }
-    foreach ($modId in $(if ($NeoForge) { @('curios', 'accessories') } else { @('curios') })) {
+    $optionalMods = @('curios')
+    if ($NeoForge -and $Properties.ContainsKey('accessories_version')) { $optionalMods += 'accessories' }
+    foreach ($modId in $optionalMods) {
         $optional = @($dependencies | Where-Object { (Read-TomlString $_.Groups[2].Value 'modId') -eq $modId })
         if ($optional.Count -ne 1) { throw "Packaged metadata must declare optional $modId integration." }
         $section = $optional[0].Groups[2].Value
@@ -137,8 +140,8 @@ function Test-ReleaseJar([string]$JarPath, [hashtable]$Properties, [bool]$NeoFor
     try {
         $entryNames = @($archive.Entries | ForEach-Object { $_.FullName })
         $forbidden = @($entryNames | Where-Object {
-            $_ -match '^draylar/inmis/gametest/' -or
-            $_ -match '^data/(inmis_game_tests|inmis_runtime_tests)/' -or
+            $_ -match '^draylar/inmis/(gametest|smoketest|runtime)/' -or
+            $_ -match '^data/(inmis_game_tests|inmis_runtime_tests|inmis_smoke_tests)/' -or
             $_ -match '^draylar/inmis/.*(?:Test|Tests)(?:\$[^/]*)?\.class$' -or
             $_ -eq 'draylar/inmis/mixin/ItemStackMixin.class' -or
             $_ -match '^(top/theillusivec4/curios|io/wispforest/accessories)/'
@@ -146,6 +149,25 @@ function Test-ReleaseJar([string]$JarPath, [hashtable]$Properties, [bool]$NeoFor
         if ($forbidden.Count) { throw "Nonproduction entries found in release JAR: $($forbidden -join ', ')" }
         if ($entryNames -notcontains 'draylar/inmis/util/BackpackStorage.class') {
             throw 'Release JAR does not contain the current backpack storage implementation.'
+        }
+        $expectedClassVersion = switch ($Properties.minecraft_version) {
+            '1.16.5' { 52 }
+            '26.1.2' { 69 }
+            '1.21.1' { 65 }
+            default { 61 }
+        }
+        foreach ($classEntry in @($archive.Entries | Where-Object { $_.FullName -match '^draylar/inmis/.*\.class$' })) {
+            $stream = $classEntry.Open()
+            $classReader = [IO.BinaryReader]::new($stream)
+            try {
+                $header = $classReader.ReadBytes(8)
+                if ($header.Length -ne 8 -or $header[0] -ne 0xca -or $header[1] -ne 0xfe -or
+                    $header[2] -ne 0xba -or $header[3] -ne 0xbe) { throw "Invalid class header: $($classEntry.FullName)" }
+                $actualClassVersion = ([int]$header[6] -shl 8) -bor [int]$header[7]
+                if ($actualClassVersion -ne $expectedClassVersion) {
+                    throw "Class $($classEntry.FullName) uses bytecode $actualClassVersion; expected $expectedClassVersion."
+                }
+            } finally { $classReader.Dispose() }
         }
         $metadataName = if ($NeoForge) { 'META-INF/neoforge.mods.toml' } else { 'META-INF/mods.toml' }
         $metadataEntry = $archive.GetEntry($metadataName)
@@ -218,8 +240,9 @@ try {
     $env:DEBUG = ''
     foreach ($version in @($Versions | Select-Object -Unique)) {
         $neoForge = $version.StartsWith('neoforge')
-        $major = if ($neoForge) { 21 } else { 17 }
-        $jdkPath = if ($neoForge) { $Java21Home } else { $Java17Home }
+        # Forge 1.16.5 compiles Java 8 bytecode through its toolchain, while ForgeGradle runs on JDK 17.
+        $major = if ($version -eq 'neoforge-26.1.2') { 25 } elseif ($neoForge) { 21 } else { 17 }
+        $jdkPath = if ($major -eq 25) { $Java25Home } elseif ($major -eq 21) { $Java21Home } else { $Java17Home }
         $env:JAVA_HOME = Find-Jdk $major $jdkPath
         $projectPath = Join-Path $repositoryRoot "$version/inmis"
         $properties = Read-GradleProperties (Join-Path $projectPath 'gradle.properties')

@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "draylar.inmis.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "refmap": "inmis.refmap.json",
+  "mixins": [
+    "AbstractArrowMixin",
+    "BlockItemMixin",
+    "HopperBlockEntityMixin",
+    "InventoryMenuMixin",
+    "ItemEntityMixin",
+    "LevelMixin",
+    "LivingEntityMixin",
+    "PlayerMixin",
+    "PlayerInventoryScreenMixin",
+    "ProjectileWeaponItemMixin",
+    "ShapedRecipeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

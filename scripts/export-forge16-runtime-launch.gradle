@@ -1,0 +1,37 @@
+// Export ForgeGradle's prepared launches, including its native MOD_CLASSES environment.
+// Minecraft itself uses Java 8; the Gradle invocation can run on Java 17.
+import groovy.json.JsonOutput
+
+gradle.projectsEvaluated {
+    rootProject.tasks.register('exportForge16RuntimeLaunch') {
+        dependsOn 'prepareRunServer', 'prepareRunClient', 'prepareRunSmokeTestServer', 'prepareRuntimeServer', 'prepareRuntimeClient', 'smokeTestClasses'
+        doLast {
+            def launcher = rootProject.javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(8)
+            }.get()
+            ['SmokeTestServer', 'RuntimeServer', 'RuntimeClient'].each { suffix ->
+                def taskName = suffix == 'SmokeTestServer' ? 'runSmokeTestServer' : suffix.uncapitalize()
+                def run = rootProject.tasks.getByName(taskName)
+                def parent = rootProject.tasks.getByName(suffix.endsWith('Server') ? 'runServer' : 'runClient')
+                // ForgeGradle 5 does not fill every inherited launch field for custom run names.
+                def environment = new LinkedHashMap(parent.environment)
+                environment.putAll(run.environment)
+                def launch = [
+                    java: launcher.executablePath.asFile.absolutePath,
+                    workingDirectory: run.workingDir.absolutePath,
+                    classpath: run.classpath.asPath,
+                    mainClass: run.main ?: parent.main,
+                    jvmArgs: run.allJvmArgs,
+                    args: run.args,
+                    environment: environment.findAll { key, value ->
+                        ['MOD_CLASSES', 'target', 'MCP_VERSION', 'MC_VERSION', 'FORGE_GROUP', 'FORGE_VERSION',
+                         'nativesDirectory', 'assetDirectory', 'assetIndex'].contains(key)
+                    }
+                ]
+                def target = rootProject.file('build/runtime/' + suffix + '-launch.json')
+                target.parentFile.mkdirs()
+                target.text = JsonOutput.prettyPrint(JsonOutput.toJson(launch))
+            }
+        }
+    }
+}

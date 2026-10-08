@@ -3,11 +3,11 @@
 ![Minecraft](https://img.shields.io/badge/Minecraft-Java%20Edition-brightgreen)
 ![License](https://img.shields.io/github/license/Draylar/inmis)
 
-**Inmis** is a Backpack mod for Minecraft, available only on Fabric until now. This repository contains implementations for **Forge** (1.18.2, 1.19.2, 1.20.1) and **NeoForge** (1.21.1).
+**Inmis** is a backpack mod for Minecraft. This repository maintains ports for **Forge** (1.16.5, 1.18.2, 1.19.2, 1.20.1) and **NeoForge** (1.21.1, 26.1.2).
 
 This is a port of the original [Fabric version](https://github.com/Draylar/inmis) to Forge and NeoForge modloaders.
 
-Version 2.9.4 is available for the four Minecraft versions listed below. Update both client and server together because the backpack menu protocol changed. Custom backpack names and tier order must agree between them; storage dimensions may differ. Per-version changes are recorded in [the release notes](docs/releases/).
+Choose the file for your Minecraft version and loader from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/inmis-forge-port), and install the same Inmis version on the client and server. See [the additional version guide](docs/version-expansion.md) for Forge 1.16.5 and NeoForge 26.1.2 setup and development details. Per-version changes are recorded in [the release notes](docs/releases/).
 
 ## Overview
 
@@ -21,6 +21,8 @@ Inmis provides players with customizable backpacks that can be:
 
 ```
 inmis-forge-neoforge/
+|-- forge-1.16.5/                   # Minecraft 1.16.5 (Forge)
+|   `-- inmis/                      # Main mod and isolated native test sources
 |-- forge-1.18.2/                   # Minecraft 1.18.2 (Forge)
 |   |-- inmis/                      # Main mod source
 |   |-- Backpacked-1.18.X/          # Backpacked reference source
@@ -36,12 +38,14 @@ inmis-forge-neoforge/
 |   |-- Backpacked-multiloader-1.20.X/  # Backpacked reference source (multiloader)
 |   |-- Curios-1.20.x/              # Curios reference source
 |   `-- release/                    # Built artifacts
-`-- neoforge-1.21.1/                # Minecraft 1.21.1 (NeoForge)
-    |-- inmis/                      # Main mod source
-    |-- Backpacked-multiloader-1.21.1/  # Backpacked reference source (multiloader)
-    |-- Curios-1.21.x/              # Curios reference source
-    |-- accessories-1.21.x/        # Accessories reference source
-    `-- release/                    # Built artifacts
+|-- neoforge-1.21.1/                # Minecraft 1.21.1 (NeoForge)
+|   |-- inmis/                      # Main mod source
+|   |-- Backpacked-multiloader-1.21.1/  # Backpacked reference source (multiloader)
+|   |-- Curios-1.21.x/              # Curios reference source
+|   |-- accessories-1.21.x/        # Accessories reference source
+|   `-- release/                    # Built artifacts
+`-- neoforge-26.1.2/                # Minecraft 26.1.2 (NeoForge)
+    `-- inmis/                      # Main mod, tests and current item model definitions
 ```
 
 Each `inmis/` directory is an independent Gradle project. Its build resolves dependencies from Maven repositories; the sibling reference sources are not included in that build. Local `release/`, build, runtime, and temporary files are excluded from Git.
@@ -49,8 +53,10 @@ Each `inmis/` directory is an independent Gradle project. Its build resolves dep
 ## Quick Start
 
 ### Prerequisites
+- JDK 17 to launch the Forge 1.16.5 build, plus an installed JDK 8 toolchain to compile and run it
 - Java Development Kit (JDK) 17 for 1.18.2-1.20.1
 - Java Development Kit (JDK) 21 for 1.21.1
+- Java Development Kit (JDK) 25 for 26.1.2
 - Gradle (included via gradlew)
 
 ### Building a Version
@@ -92,16 +98,16 @@ Customize gameplay through `config/inmis.json`:
 
 ## Version-Specific Details
 
-### Forge Versions (1.18.2, 1.19.2, 1.20.1)
+### Forge Versions (1.16.5, 1.18.2, 1.19.2, 1.20.1)
 Each Forge version includes:
 - Forge event and mixin integration
 - Curios mod support for enhanced trinket slots
 
-### NeoForge (1.21.1)
-The NeoForge version uses:
-- NeoForge events and mixins for Minecraft 1.21.1
+### NeoForge (1.21.1, 26.1.2)
+The NeoForge versions use:
+- NeoForge events and mixins for their respective Minecraft versions
 - Item data components for backpack contents and augments
-- Optional Curios and Accessories integration
+- Optional Curios integration on both versions; Accessories integration on 1.21.1
 
 ## Development
 
@@ -130,9 +136,9 @@ inmis/
 - **Curios**: Optional trinket/accessory integration
 - **Accessories (NeoForge 1.21.1)**: Optional accessory integration
 
-NeoForge includes headless JUnit regression tests. `gradlew build` runs these tests and checks compilation, resource processing, and JAR packaging; Forge also reobfuscates its JAR. Separate test source sets run gameplay regressions in real Minecraft GameTest servers across all four branches.
+NeoForge includes headless JUnit regression tests. `gradlew build` runs these tests and checks compilation, resource processing, and JAR packaging; Forge also reobfuscates its JAR. Separate test source sets run gameplay regressions in real Minecraft GameTest servers on 1.18.2 and newer. Forge 1.16.5 uses a separate native server regression fixture because that Minecraft version predates GameTest.
 
-The [feedback audit and runtime results](docs/feedback-audit.md) records confirmed defects, validation evidence and remaining modpack coverage. On Windows, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/validate-feedback.ps1` to build and stage all branches, or use `./scripts/verify-runtime.ps1` to run GameTests and an isolated NeoForge client/server restart check. Each validation run keeps its own artifacts, logs and SHA-256 manifest under `temp/feedback-validation/`. Test code is excluded from release JARs; existing Prism instances and saves are untouched.
+The [feedback audit and runtime results](docs/feedback-audit.md) records confirmed defects, validation evidence and remaining modpack coverage. On Windows, run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/validate-feedback.ps1` to build and stage all branches, or use `./scripts/verify-runtime.ps1` to run GameTests and isolated NeoForge client/server restart checks. Select `-Versions neoforge-26.1.2 -NeoProfiles none,curios -ClientProfiles none,curios` for the new NeoForge port. Forge 1.16.5 has its own `./scripts/verify-forge16-runtime.ps1` runner. Each validation run keeps its own artifacts, logs and SHA-256 manifest under `temp/feedback-validation/`. Test code is excluded from release JARs; existing Prism instances and saves are untouched.
 
 ## License
 
@@ -153,10 +159,12 @@ Contributions are welcome! Please consider:
 
 | Version | Modloader | Status | Java |
 |---------|-----------|--------|------|
+| 1.16.5  | Forge     | Active | 8    |
 | 1.18.2  | Forge     | Active | 17   |
 | 1.19.2  | Forge     | Active | 17   |
 | 1.20.1  | Forge     | Active | 17   |
 | 1.21.1  | NeoForge  | Active | 21   |
+| 26.1.2  | NeoForge  | Active | 25   |
 
 ---
 

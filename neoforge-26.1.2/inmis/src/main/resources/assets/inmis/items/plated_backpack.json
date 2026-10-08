@@ -1,0 +1,11 @@
+{
+    "model":  {
+                  "tints":  [
+                                {
+                                    "type":  "inmis:backpack"
+                                }
+                            ],
+                  "model":  "inmis:item/plated_backpack",
+                  "type":  "minecraft:model"
+              }
+}

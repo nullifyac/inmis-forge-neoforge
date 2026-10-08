@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "inmis",
+  "version": "forge-port",
+  "name": "Inmis (NeoForge build)",
+  "description": "This NeoForge build ships a Fabric metadata stub so cross-loader utilities can identify it correctly.",
+  "license": "MIT",
+  "environment": "*",
+  "custom": {
+    "distribution": "neoforge"
+  },
+  "depends": {
+    "fabricloader": ">=999.0.0"
+  }
+}

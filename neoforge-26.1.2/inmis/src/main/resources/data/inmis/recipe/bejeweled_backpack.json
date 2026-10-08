@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "#e#",
+    "eXe",
+    "#e#"
+  ],
+  "key": {
+    "#": "minecraft:diamond",
+    "X": "inmis:gilded_backpack",
+    "e": "minecraft:emerald"
+  },
+  "result": {
+    "id": "inmis:bejeweled_backpack"
+  }
+}

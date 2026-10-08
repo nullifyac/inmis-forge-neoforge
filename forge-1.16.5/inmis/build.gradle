@@ -1,0 +1,125 @@
+plugins {
+    id 'net.minecraftforge.gradle' version '5.1.77'
+    id 'org.spongepowered.mixin' version '0.7-SNAPSHOT'
+    id 'maven-publish'
+}
+
+group = project.maven_group
+version = "${project.fabric_version}-${project.mod_version}-${project.minecraft_version}"
+archivesBaseName = project.archives_base_name
+
+// Gradle runs on Java 17; compilation and Minecraft use Java 8.
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(8)
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.theillusivec4.top/' }
+}
+
+def compatProfile = (project.findProperty('compatProfile') ?: 'none').toString()
+if (!(compatProfile in ['none', 'curios'])) {
+    throw new GradleException('compatProfile must be none or curios for Minecraft 1.16.5')
+}
+
+sourceSets {
+    smokeTest {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+configurations {
+    smokeTestImplementation.extendsFrom implementation
+    smokeTestCompileOnly.extendsFrom compileOnly
+    smokeTestRuntimeOnly.extendsFrom runtimeOnly
+}
+
+minecraft {
+    mappings channel: 'official', version: project.minecraft_version
+    runs {
+        client {
+            workingDirectory project.file('run/client')
+            property 'forge.logging.console.level', 'info'
+            property 'mixin.env.disableRefMap', 'true'
+            jvmArgs '-Xms512m', '-Xmx2g'
+            mods { inmis { source sourceSets.main } }
+        }
+        server {
+            workingDirectory project.file('run/server')
+            property 'forge.logging.console.level', 'info'
+            property 'mixin.env.disableRefMap', 'true'
+            jvmArgs '-Xms512m', '-Xmx2g'
+            args 'nogui'
+            mods { inmis { source sourceSets.main } }
+        }
+        smokeTestServer {
+            parent minecraft.runs.server
+            workingDirectory project.file("build/smokeTest/${compatProfile}")
+            property 'inmis.serverChecks', 'true'
+            property 'inmis.compatProfile', compatProfile
+            mods { inmis_smoke_tests { source sourceSets.smokeTest } }
+        }
+        runtimeServer {
+            parent minecraft.runs.server
+            workingDirectory project.file('build/runtime/server')
+            property 'inmis.smokeServer', 'true'
+            mods { inmis_smoke_tests { source sourceSets.smokeTest } }
+        }
+        runtimeClient {
+            parent minecraft.runs.client
+            workingDirectory project.file('build/runtime/client')
+            property 'inmis.smokeClient', 'true'
+            args '--username', 'Dev', '--width', '1280', '--height', '720'
+            mods { inmis_smoke_tests { source sourceSets.smokeTest } }
+        }
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
+    compileOnly fg.deobf("top.theillusivec4.curios:curios-forge:${project.curios_version}")
+    if (compatProfile == 'curios') {
+        runtimeOnly fg.deobf("top.theillusivec4.curios:curios-forge:${project.curios_version}")
+    }
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+}
+
+mixin {
+    add sourceSets.main, "inmis.refmap.json"
+    config "inmis.mixins.json"
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", project.minecraft_version
+    filesMatching("META-INF/mods.toml") {
+        expand "version": project.version, "minecraft_version": project.minecraft_version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+// Mixin refmaps must include all injections even when only one source changed.
+tasks.named('compileJava') { options.incremental = false }
+
+jar {
+    manifest { attributes 'MixinConfigs': 'inmis.mixins.json' }
+    from("LICENSE") { rename { "${it}_${project.archivesBaseName}" } }
+}
+jar.finalizedBy('reobfJar')
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact(jar)
+            artifact(sourcesJar)
+        }
+    }
+}

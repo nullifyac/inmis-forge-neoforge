@@ -1,0 +1,143 @@
+package draylar.inmis.compat;
+
+import draylar.inmis.Inmis;
+import draylar.inmis.config.BackpackInfo;
+import draylar.inmis.item.component.BackpackComponent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.ByteTag;
+import net.minecraft.nbt.NumericTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+public final class BackpackedDataImporter {
+
+    private static final String ITEMS_KEY = "Items";
+
+    private BackpackedDataImporter() {
+    }
+
+    public static BackpackComponent tryImport(ItemStack stack, BackpackInfo info) {
+        if (!BackpackedImportController.isImportEnabled()) {
+            return null;
+        }
+
+        CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+        if (customData == null) {
+            return null;
+        }
+
+        CompoundTag tag = customData.copyTag();
+        if (!(tag.get(ITEMS_KEY) instanceof ListTag list)) {
+            return null;
+        }
+
+        int size = info.getRowWidth() * info.getNumberOfRows();
+        if (size <= 0) {
+            return null;
+        }
+
+        List<ItemStack> slots = createEmptyList(size);
+        boolean populatedSlot = false;
+        boolean hadEntries = list.size() > 0;
+        Set<Integer> occupiedSlots = new HashSet<>();
+        HolderLookup.Provider registries = resolveRegistries();
+        if (registries == null) {
+            Inmis.LOGGER.warn("Skipping Backpacked import for {} because no registry access is available yet", stack.getHoverName().getString());
+            return null;
+        }
+
+        for (int i = 0; i < list.size(); i++) {
+            if (!(list.get(i) instanceof CompoundTag entry)) {
+                return null;
+            }
+            int slot = entry.get("Slot") instanceof ByteTag ? entry.getByteOr("Slot", (byte) 0) & 255
+                    : entry.getInt("Slot").orElse(i);
+            if (slot < 0 || slot >= Short.MAX_VALUE - 36) {
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because slot {} cannot be represented by a backpack menu", stack.getHoverName().getString(), slot);
+                return null;
+            }
+
+            Optional<ItemStack> parsed = ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), entry).result();
+            ItemStack importedStack = parsed.orElse(ItemStack.EMPTY);
+            if (importedStack.isEmpty()) {
+                if (entry.isEmpty() || "minecraft:air".equals(entry.getStringOr("id", ""))
+                        || (entry.get("count") instanceof NumericTag && entry.getIntOr("count", 0) <= 0)) {
+                    continue;
+                }
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because an item could not be decoded", stack.getHoverName().getString());
+                return null;
+            }
+            if (!occupiedSlots.add(slot)) {
+                Inmis.LOGGER.warn("Preserving Backpacked data on {} because slot {} contains multiple items", stack.getHoverName().getString(), slot);
+                return null;
+            }
+            // Recovery rows expose saved contents beyond the target tier's configured capacity.
+            while (slots.size() <= slot) {
+                slots.add(ItemStack.EMPTY);
+            }
+            slots.set(slot, importedStack);
+            populatedSlot = true;
+        }
+
+        tag.remove(ITEMS_KEY);
+        if (tag.isEmpty()) {
+            stack.remove(DataComponents.CUSTOM_DATA);
+        } else {
+            stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        }
+
+        if (populatedSlot) {
+            Inmis.LOGGER.info("Imported Backpacked data into {}", stack.getHoverName().getString());
+        } else if (hadEntries) {
+            Inmis.LOGGER.debug("Backpacked data in {} was empty after conversion", stack.getHoverName().getString());
+        }
+
+        return new BackpackComponent(slots);
+    }
+
+    private static HolderLookup.Provider resolveRegistries() {
+        if (ServerLifecycleHooks.getCurrentServer() != null) {
+            return ServerLifecycleHooks.getCurrentServer().registryAccess();
+        }
+
+        if (FMLEnvironment.getDist() == Dist.CLIENT) {
+            return getClientRegistryAccess();
+        }
+
+        return null;
+    }
+
+    private static HolderLookup.Provider getClientRegistryAccess() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level != null) {
+            return minecraft.level.registryAccess();
+        }
+
+        ClientPacketListener connection = minecraft.getConnection();
+        return connection != null ? connection.registryAccess() : null;
+    }
+
+    private static List<ItemStack> createEmptyList(int size) {
+        List<ItemStack> slots = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            slots.add(ItemStack.EMPTY);
+        }
+        return slots;
+    }
+}

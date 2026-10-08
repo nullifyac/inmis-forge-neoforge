@@ -1,0 +1,174 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+group = project.maven_group
+version = "${project.fabric_version}-${project.mod_version}-${project.minecraft_version}"
+
+base {
+    archivesName = project.archives_base_name
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    withSourcesJar()
+}
+
+def compatProfile = providers.gradleProperty('compatProfile').getOrElse('none')
+if (!['none', 'curios'].contains(compatProfile)) {
+    throw new GradleException("Unknown compatibility profile '${compatProfile}'; use none or curios.")
+}
+
+sourceSets {
+    gameTest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    // This configuration reaches only the test source set, keeping normal runs and publications independent.
+    compatTestRuntime {
+        canBeConsumed = false
+        canBeResolved = false
+    }
+    gameTestImplementation.extendsFrom implementation
+    gameTestCompileOnly.extendsFrom compileOnly
+    gameTestRuntimeOnly.extendsFrom runtimeOnly, compatTestRuntime
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.theillusivec4.top/' }
+}
+
+neoForge {
+    version = project.neoforge_version
+    addModdingDependenciesTo sourceSets.gameTest
+
+    runs {
+        client {
+            client()
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+        }
+
+        gameTestServer {
+            type = 'gameTestServer'
+            sourceSet = sourceSets.gameTest
+            gameDirectory = layout.buildDirectory.dir("gameTest/${compatProfile}").get().asFile
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'inmis_game_tests'
+            systemProperty 'inmis.test.compatProfile', compatProfile
+            jvmArgument '-Xmx2G'
+        }
+
+        runtimeServer {
+            server()
+            sourceSet = sourceSets.gameTest
+            gameDirectory = layout.buildDirectory.dir('runtime/server').get().asFile
+            systemProperty 'inmis.smokeServer', 'true'
+            programArgument '--nogui'
+            jvmArgument '-Xmx2G'
+        }
+
+        runtimeClient {
+            client()
+            sourceSet = sourceSets.gameTest
+            gameDirectory = layout.buildDirectory.dir('runtime/client').get().asFile
+            systemProperty 'inmis.smokeClient', 'true'
+            programArgument '--width'
+            programArgument '1280'
+            programArgument '--height'
+            programArgument '720'
+            jvmArgument '-Xmx2G'
+        }
+    }
+
+    mods {
+        inmis {
+            sourceSet sourceSets.main
+        }
+        inmis_game_tests {
+            sourceSet sourceSets.gameTest
+        }
+    }
+
+    runs.named('client') {
+        loadedMods = [mods.inmis]
+    }
+    runs.named('server') {
+        loadedMods = [mods.inmis]
+    }
+
+    unitTest {
+        enable()
+        testedMod = mods.inmis
+        loadedMods = [mods.inmis]
+    }
+}
+
+dependencies {
+    compileOnly "top.theillusivec4.curios:curios-neoforge:${project.curios_version}:api"
+
+    if (compatProfile == 'curios') {
+        compatTestRuntime("top.theillusivec4.curios:curios-neoforge:${project.curios_version}") {
+            transitive = false
+        }
+    }
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+    maxParallelForks = 1
+    maxHeapSize = '512m'
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "neoforge_version", project.neoforge_version
+    inputs.property "curios_version", project.curios_version
+    inputs.property "curios_version_range", project.curios_version_range
+
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand "version": project.version,
+                "minecraft_version": project.minecraft_version,
+                "neoforge_version": project.neoforge_version,
+                "curios_version": project.curios_version,
+                "curios_version_range": project.curios_version_range
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xmaxerrs', '400']
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifact(jar)
+            artifact(sourcesJar)
+        }
+    }
+}

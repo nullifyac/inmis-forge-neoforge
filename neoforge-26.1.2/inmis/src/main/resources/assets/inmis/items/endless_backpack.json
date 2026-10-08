@@ -1,0 +1,11 @@
+{
+    "model":  {
+                  "tints":  [
+                                {
+                                    "type":  "inmis:backpack"
+                                }
+                            ],
+                  "model":  "inmis:item/endless_backpack",
+                  "type":  "minecraft:model"
+              }
+}

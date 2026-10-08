@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "#f#",
+    "fXf",
+    "#f#"
+  ],
+  "key": {
+    "#": "minecraft:netherite_ingot",
+    "f": "minecraft:magma_block",
+    "X": "inmis:bejeweled_backpack"
+  },
+  "result": {
+    "id": "inmis:blazing_backpack"
+  }
+}

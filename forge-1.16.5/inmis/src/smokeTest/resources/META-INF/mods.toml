@@ -1,0 +1,16 @@
+modLoader="javafml"
+loaderVersion="[36,)"
+license="MIT"
+
+[[mods]]
+modId="inmis_smoke_tests"
+version="1"
+displayName="Inmis isolated verification fixtures"
+description="Development-only native runtime assertions."
+
+[[dependencies.inmis_smoke_tests]]
+modId="inmis"
+mandatory=true
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"
