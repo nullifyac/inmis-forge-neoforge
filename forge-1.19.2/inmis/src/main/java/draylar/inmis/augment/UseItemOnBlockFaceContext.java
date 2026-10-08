@@ -1,3 +1,10 @@
+/*
+ * Backpacked-derived portions by MrCrayfish and contributors (GNU LGPL v2.1).
+ * Source: https://github.com/MrCrayfish/Backpacked/blob/73db4d7cd729ebcd05b4cab8d7c0f7be9eeaa19a/common/src/main/java/com/mrcrayfish/backpacked/common/UseItemOnBlockFaceContext.java
+ * Adapted for Inmis packages and Minecraft/loader APIs.
+ * Attribution notice added 2026-10-08; see THIRD-PARTY-NOTICES.txt and
+ * LICENSES/Backpacked-LGPL-2.1.txt in the main resources.
+ */
 package draylar.inmis.augment;
 
 import net.minecraft.core.BlockPos;

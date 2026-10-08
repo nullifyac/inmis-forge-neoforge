@@ -153,7 +153,7 @@ The [troubleshooting guide](docs/feedback-audit.md) describes storage safeguards
 
 ## License
 
-Inmis is licensed under the **MIT License**.
+Original Inmis portions use the **MIT License**. Backpacked-derived augment code, translations and GUI textures retain **GNU LGPL v2.1** terms. See [third-party credits and licenses](THIRD-PARTY.md) for attribution, source links and the bundled notices.
 
 ## Contributing
 

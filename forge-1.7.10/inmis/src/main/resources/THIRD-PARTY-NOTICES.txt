@@ -1,0 +1,65 @@
+THIRD-PARTY NOTICES
+
+Inmis portions
+Original Inmis by Draylar; Forge/NeoForge ports maintained by nullifyac.
+The MIT license for the Inmis portions is included in LICENSES/Inmis-MIT.txt.
+
+Backpacked-derived portions
+Project: Backpacked by MrCrayfish and contributors.
+License: GNU Lesser General Public License, version 2.1.
+Full license: LICENSES/Backpacked-LGPL-2.1.txt.
+Upstream source: https://github.com/MrCrayfish/Backpacked/tree/73db4d7cd729ebcd05b4cab8d7c0f7be9eeaa19a
+
+Backpacked-derived augment code, placement/sound helpers and mixins,
+augment translation content, and the GUI textures below retain their
+upstream LGPL v2.1 terms. Original Inmis portions retain their MIT terms.
+The corresponding sources and source PNG resources are included in
+this port repository and its corresponding source archives.
+Port source: https://github.com/nullifyac/inmis-forge-neoforge
+Port module: forge-1.7.10/inmis/src/main/
+
+Modifications include Inmis package/resource namespaces, Minecraft and
+loader API adaptations, augment integration, and legacy resource formats.
+PNG contents are unchanged. Attribution notices were added 2026-10-08.
+
+Backpacked GUI textures (Inmis resource paths -> upstream resource paths):
+  assets/inmis/textures/gui/sprites/augment/farmhand.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/farmhand.png
+  assets/inmis/textures/gui/sprites/augment/funnelling.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/funnelling.png
+  assets/inmis/textures/gui/sprites/augment/hopper_bridge.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/hopper_bridge.png
+  assets/inmis/textures/gui/sprites/augment/imbued_hide.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/imbued_hide.png
+  assets/inmis/textures/gui/sprites/augment/immortal.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/immortal.png
+  assets/inmis/textures/gui/sprites/augment/lightweaver.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/lightweaver.png
+  assets/inmis/textures/gui/sprites/augment/lootbound.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/lootbound.png
+  assets/inmis/textures/gui/sprites/augment/quiverlink.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/quiverlink.png
+  assets/inmis/textures/gui/sprites/augment/reforge.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/reforge.png
+  assets/inmis/textures/gui/sprites/augment/seedflow.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/augment/seedflow.png
+  assets/inmis/textures/gui/sprites/backpack/settings.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/backpack/settings.png
+  assets/inmis/textures/gui/sprites/backpack/toggle_off.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/backpack/toggle_off.png
+  assets/inmis/textures/gui/sprites/backpack/toggle_on.png
+    -> common/src/main/resources/assets/backpacked/textures/gui/sprites/backpack/toggle_on.png
+
+Legacy aliases (unchanged copies of the matching backpack/ PNG):
+  assets/inmis/textures/gui/sprites/settings.png -> assets/inmis/textures/gui/sprites/backpack/settings.png
+  assets/inmis/textures/gui/sprites/toggle_off.png -> assets/inmis/textures/gui/sprites/backpack/toggle_off.png
+  assets/inmis/textures/gui/sprites/toggle_on.png -> assets/inmis/textures/gui/sprites/backpack/toggle_on.png
+
+Known adapted placement/sound and hopper source files:
+  This legacy port implements its augment integration in native events.
+
+Backpacked-derived translation content:
+  assets/inmis/lang/: augment.backpacked.* augment names, descriptions,
+  modes and filter labels. Legacy .lang files use escaped line breaks.
+  Upstream: common/src/main/resources/assets/backpacked/lang/
+  These are scoped translation portions, not the other Inmis entries.
